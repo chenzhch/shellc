@@ -2,12 +2,12 @@
 ### Tool for converting shell scripts into C code
 ## Install
 ```bash
-cc -s shellc.c -o shellc
+cc -s shellc.c -O2 -o shellc
 ```
 ### Compile shell scripts and generate executable programs
 ```bash
 shellc example.sh
-cc -s example.sh.c -o example
+cc -s example.sh.c -O2 -o example
 ```
 The generated C code is ```example.sh.c```, which is the original file name followed by ```.c```.
 For programs used in production environments, it is recommended to add the parameter ```-s``` when compiling to remove the symbol table in the executable program, increasing the difficulty of disassembly and reverse engineering.
