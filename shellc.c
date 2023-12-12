@@ -4,9 +4,10 @@
  * Function: Convert shell scripts into C code
  * Author: ChenZhongChao
  * E-Mail: nbczc@163.com
- * Date: 2023-12-01
- * Version: 0.1
+ * Date: 2023-12-12
+ * Version: 0.2
  * Github: https://github.com/chenzhch/shellc.git
+ * Gitee: https://gitee.com/chenzhch/shellc.git
  */
 
 #include <sys/stat.h>
@@ -80,13 +81,7 @@ static const char *middle[] = {
     "        f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16,",
     "        f17, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27, f28, f29, f30, f31, f32",
     "    };",
-    "    char *main = \"____shellC___MaiN__fUNcTioN_20231201_v01_\";",
-    "    struct Data {",
-    "        int mode;",
-    "        int length;",
-    "        long bitmap;",
-    "        long x;",
-    "        long y;",
+    "    char *main = \"____shellC___MaiN__fUNcTioN_20231212_v02_\";",
     0
 };
 
@@ -104,14 +99,17 @@ static const char *tail[] = {
     "    fputs(\"(){ \", pipe);",
     "    i = 0;",
     "    memset(str, 0, sizeof(str));",
-    "    while(data[i].mode) {",
-    "        mask = (long) 1 << (data[i].length - 1);",
-    "        for(j = 0; j < data[i].length; j++) {",
-    "            memcpy(str, &data[i].text[j * 2], 2);",
-    "            fputc((data[i].bitmap + ff(fn[data[i].mode -1], data[i].x, data[i].y)) & mask ? strtol(str, 0, 16) : 0, pipe);",
+    "    while(data[i]) {",
+    "        mask = (long) 1 << (atol(data[i + 1]) - 1);",
+    "        for(j = 0; j < atol(data[i + 1]); j++) {",
+    "            memcpy(str, &data[i + 5][j * 2], 2);",
+    "            fputc((atol(data[i + 2]) + ff(fn[atol(data[i]) -1], atol(data[i + 3]), atol(data[i + 4]))) & mask", 
+    "                   ? strtol(str, 0, 16) ^ ((atol(data[i + 2]) + ff(fn[atol(data[i]) -1], atol(data[i + 3]), atol(data[i + 4]))) % 256)"
+    "                   : 0, pipe",
+    "            );",
     "            mask >>= 1;",
     "        }",
-    "        i++;",
+    "        i += 6;",
     "    }",
     "    fputs(\"\\n}\\n\", pipe);",
     "    fputs(main, pipe);",
@@ -181,7 +179,7 @@ void macro(int order, int x, int y, char *str)
     }
 }
 
-void main(int argc, char **argv) 
+void main(int argc, char **argv)
 {
     struct stat status;
     FILE *in, *out, *pipe;
@@ -190,7 +188,7 @@ void main(int argc, char **argv)
     unsigned char *bitmap, *text;
     unsigned char str[64];
     long result, offset1, offset2;
-    long mask;
+    long mask, salt;
     int size, digit;
     int route[32][17], x[32][16], y[32][16];
     int i, j, k, ch, loop, mode;
@@ -209,15 +207,10 @@ void main(int argc, char **argv)
     for(i = 0; i < code_length; i++) {
         code_text[i] = fgetc(in);
     }
-
-    if(code_length < 2048) {
-        obscure_length = 4096;
-    } else {
-        obscure_length = code_length * 2;
-    }
+    srand(time(0));
+    obscure_length = code_length + code_length / 10 * 3 + rand() % 100 + 4096;
     bitmap = (unsigned char *) malloc(obscure_length * 2);
     obscure_text = (unsigned char *) malloc(obscure_length * 2);
-    srand(time(0));
     loop = 1;
 
     /*Randomly generated visible obfuscated characters*/
@@ -303,9 +296,7 @@ void main(int argc, char **argv)
     }
 
     size = sizeof(long) * 8;
-    fprintf(out, "        unsigned char text[%d];\n", (size - 2) * 2);
-    fprintf(out, "    };\n");
-    fprintf(out, "    struct Data data[] = {\n");
+    fprintf(out, "    char *data[] = {\n");
     free(text);
     text =(char *) malloc(size);
     j = 0;
@@ -319,6 +310,7 @@ void main(int argc, char **argv)
         obscure_length -= length;
         memset(text, 0, sizeof(text));
         result = binary_to_int(bitmap + j, length);
+        salt = result % 256;
         memcpy(text, obscure_text + j, length);
         j += length;
         offset1 = rand() % 1000 + 10;
@@ -361,13 +353,13 @@ void main(int argc, char **argv)
             }
             i++;
         }
-        fprintf(out, "        {%d, %d, %ld, %ld, %ld, \"", mode + 1, length, result, offset1, offset2);
+        fprintf(out, "        \"%d\", \"%d\", \"%ld\", \"%ld\", \"%ld\", \"", mode + 1, length, result, offset1, offset2);
         for(i = 0; i < length; i++) {
-            fprintf(out, "%02X", (unsigned char) text[i]);
+            fprintf(out, "%02X", ((unsigned char) text[i]) ^ salt);
         }
-        fprintf(out, "\"},\n");
+        fprintf(out, "\",\n");
     }
-    fprintf(out, "        {0, 0, 0, 0, 0, 0}\n");
+    fprintf(out, "        0\n");
     fprintf(out, "    };\n");
 
     /*Write to the end of the file*/
