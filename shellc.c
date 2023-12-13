@@ -76,7 +76,7 @@ static const char *middle[] = {
     "    int i, j;",
     "    FILE *pipe;",
     "    long mask;",
-    "    char str[3];",
+    "    char str[3], chr[2];",
     "    Fn fn[] = {",
     "        f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16,",
     "        f17, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27, f28, f29, f30, f31, f32",
@@ -99,14 +99,17 @@ static const char *tail[] = {
     "    fputs(\"(){ \", pipe);",
     "    i = 0;",
     "    memset(str, 0, sizeof(str));",
+    "    memset(chr, 0, sizeof(chr));",
     "    while(data[i]) {",
     "        mask = (long) 1 << (atol(data[i + 1]) - 1);",
     "        for(j = 0; j < atol(data[i + 1]); j++) {",
     "            memcpy(str, &data[i + 5][j * 2], 2);",
-    "            fputc((atol(data[i + 2]) + ff(fn[atol(data[i]) -1], atol(data[i + 3]), atol(data[i + 4]))) & mask", 
-    "                   ? strtol(str, 0, 16) ^ ((atol(data[i + 2]) + ff(fn[atol(data[i]) -1], atol(data[i + 3]), atol(data[i + 4]))) % 256)"
-    "                   : 0, pipe",
+    "            sprintf(chr, \"%c\",",
+    "               (atol(data[i + 2]) + ff(fn[atol(data[i]) -1], atol(data[i + 3]), atol(data[i + 4]))) & mask", 
+    "               ? strtol(str, 0, 16) ^ ((atol(data[i + 2]) + ff(fn[atol(data[i]) -1], atol(data[i + 3]), atol(data[i + 4]))) % 256)", 
+    "               : 0",
     "            );",
+    "            fputs(chr, pipe);",
     "            mask >>= 1;",
     "        }",
     "        i += 6;",
@@ -207,28 +210,29 @@ void main(int argc, char **argv)
     for(i = 0; i < code_length; i++) {
         code_text[i] = fgetc(in);
     }
+    
     srand(time(0));
-    obscure_length = code_length + code_length / 10 * 3 + rand() % 100 + 4096;
+    obscure_length = code_length / 5 * 6  + rand() % 1024 + 4096;
     bitmap = (unsigned char *) malloc(obscure_length * 2);
     obscure_text = (unsigned char *) malloc(obscure_length * 2);
-    loop = 1;
-
+    
     /*Randomly generated visible obfuscated characters*/
+    loop = 1;
     while(loop) {
         j = 0;
         for(i = 0; i < code_length; j++) {
             digit = rand() % obscure_length;
-            if(digit < code_length){
+            if(digit < code_length) {
                 bitmap[j] = '1';
                 obscure_text[j] = code_text[i++];
-            }else{
+            } else {
                 bitmap[j] = '0';
                 digit = rand() % 3;
                 obscure_text[j] = digit == 0 ? code_text[i] : rand() % 95 + 32;
             }
             if(j == obscure_length * 2) break;
         }
-        if( i == code_length){
+        if(i == code_length){
             loop = 0;
         }
     }
@@ -294,10 +298,10 @@ void main(int argc, char **argv)
     for(i=0; middle[i]; i++) {
         fprintf(out, "%s\n", middle[i]);
     }
-
-    size = sizeof(long) * 8;
+    
     fprintf(out, "    char *data[] = {\n");
     free(text);
+    size = sizeof(long) * 8;
     text =(char *) malloc(size);
     j = 0;
     while(obscure_length) {
@@ -353,7 +357,7 @@ void main(int argc, char **argv)
             }
             i++;
         }
-        fprintf(out, "        \"%d\", \"%d\", \"%ld\", \"%ld\", \"%ld\", \"", mode + 1, length, result, offset1, offset2);
+        fprintf(out, "        \"%d\", \"%d\", \"%ld\", \"%ld\", \"%ld\", \n        \"", mode + 1, length, result, offset1, offset2);
         for(i = 0; i < length; i++) {
             fprintf(out, "%02X", ((unsigned char) text[i]) ^ salt);
         }
