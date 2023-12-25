@@ -330,7 +330,7 @@ int main(int argc, char **argv)
     }
     sprintf(code_text + strlen(code_text), "%c}%c%s", '\n', '\n', shellc);
     srand(time(0));
-    obscure_length = code_length / 5 * 6  + rand() % 1024 + 4096; 
+    obscure_length = code_length / 5 * 6  + rand() % 1024; 
     bitmap = (char *) malloc(obscure_length * 2);
     obscure_text = (char *) malloc(obscure_length * 2);
     
