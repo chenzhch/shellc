@@ -22,7 +22,7 @@ This program is suitable for shells that can define function syntax, such as ```
 
 **If the shell script involves human-computer interaction, some modifications need to be made to the original shell script, and ```read input``` needs to be changed to ```read input </dev/tty```.**
 
-**Warning: The compiled program does not support the $0 parameter because the actual command executed by the compiled program is similar to ```cat script.sh | $SHELL```. The program name corresponding to $0 is the SHELL environment variable name, not the pre compiled script program name。**
+**Warning: The compiled program does not support the $0 parameter because the actual command executed by the compiled program is similar to ```cat script.sh | $SHELL```. The value of $0 corresponds to the SHELL environment variable name，not the pre compiled script program name.**
 
 Version 3 has added untraceable and tested the following tools for untraceable
 
