@@ -1,0 +1,2 @@
+echo "VAL:$val"
+print_error 

@@ -1,0 +1,5 @@
+#newline using  using \n
+#double qutoation mark  using \" 
+\n arg0=\"?\";
+echo \"arg=$arg0\"\n echo \"ARG0:$arg0\"\n
+val='?';
