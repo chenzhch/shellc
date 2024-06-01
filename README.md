@@ -53,7 +53,7 @@ At present, the program has practical applications in ``` AIX```, ```UNIX```, ``
     
     Fix arguments 0  supports ```fish```, ```zsh```, ```perl```, ```python```, ```javascript```, ```lua```, ```ruby```, orresponding to the uppercase letters of these scripts.
 
-    In addition to built-in fix types, custom file fix can also be used. Custom file format：```？```Indicates parameter 0 value, line breaks must be explicitly used```\n```, Double quotes require an escape character ```\```。Specific reference ``` test/fix.txt```。
+    In addition to built-in fix types, custom file fix can also be used. Custom file format：```？```Indicates parameter 0 value, line breaks must be explicitly used```\n```, Double quotes require an escape character ```\```.Specific reference ``` test/fix.txt```.
 
 ### Untraceable
 Version 0.3  and above has added untraceable and tested the following tools for untraceable
