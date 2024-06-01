@@ -31,7 +31,7 @@ At present, the program has practical applications in ``` AIX```, ```UNIX```, ``
 
     -t option：    For systems that do not support anti debugging functionality, this option is required for generated code.
 
-    -s option：    Generate C code mode, the - s option uses safe mode, and defaults to normal mode.
+    -s option：    Generate C code mode, the -s option uses safe mode, and defaults to normal mode.
 
     -f option：    Fix parameter 0 value.
 
