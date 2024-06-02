@@ -49,7 +49,7 @@ At present, the program has practical applications in ```AIX```, ```UNIX```, ```
 
 - Fix arguments 0
     
-    Fix arguments 0  supports ```BASH```、```FISH```、```ZSH```、```PERL```、```PYTHON```、```JAVASCRIPT```、```LUA```、```RUBY```. 
+    Fix arguments 0  supports ```BASH```, ```FISH```, ```ZSH```, ```PERL```, ```PYTHON```, ```JAVASCRIPT```, ```LUA```, ```RUBY```. 
 
     In addition to built-in fix types, custom file fix can also be used. Custom file format：```？```Indicates parameter 0 value, line breaks must be explicitly used```\n```, Double quotes require an escape character ```\```.Reference ```test/fix.txt```.
 
