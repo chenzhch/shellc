@@ -2,12 +2,12 @@
 **Tool for converting scripts into C code**
 ### Install
 ```bash
-cc -s shellc.c -O2 -o shellc
+cc shellc.c -O2 -o shellc
 ```
 ### Compile shell scripts and generate executable programs
 ```bash
 shellc sh example.sh
-cc -s example.sh.c -O2 -o example
+cc example.sh.c -O2 -o example
 ```
 The generated C code is ```example.sh.c```, which is the original file name followed by ```.c```.
 For programs used in production environments, it is recommended to add the parameter ```-s``` or use the ```strip``` command after compilation to remove the symbol table in the executable program, increasing the difficulty of disassembly and reverse engineering.
@@ -18,8 +18,8 @@ I have tried the tools ```shc``` and ```shellcrypt```, which can compile shell s
 
 In addition to solving the problems of the above two tools, ```shellc```  also adds code obfuscation, randomly generating effective character position calculation functions, random character encryption, and debugging to increase the complexity of disassembly and reverse engineering.
 
-In addition to supporting shell, version 1.0 also adds other scripting languages to support generating C code, which can completely replace ``` shc```.
-At present, the program has practical applications in ``` AIX```, ```UNIX```, ``` Linux``` environments. It is recommended to conduct comprehensive testing on the compiled program to prevent production failures.
+Version 1.0 or above not only support shell, but also other scripting languages, which can completely replace  ```shc```.
+At present, the program has practical applications in ```AIX```, ```UNIX```, ```Linux``` environments. It is recommended to conduct comprehensive testing on the compiled program to prevent production failures.
 ### User manual
 - Generate C code command
  
@@ -31,7 +31,7 @@ At present, the program has practical applications in ``` AIX```, ```UNIX```, ``
 
     -t option：    For systems that do not support anti debugging functionality, this option is required for generated code.
 
-    -s option：    Generate C code mode, the -s option uses safe mode, and defaults to normal mode.
+    -s option：    Generate C code mode, the - s option uses safe mode, and defaults to normal mode.
 
     -f option：    Fix parameter 0 value.
 
@@ -39,24 +39,22 @@ At present, the program has practical applications in ``` AIX```, ```UNIX```, ``
 
     The normal mode shell script has some code visibility issues in most Linux operating systems, and the code after the ```read``` command can be obtained through ```/proc/[pid]/fd/[pipe]```. The safe mode does not have this issue.
 
-    When running in normal mode on the FreeBSD system, the script cannot contain operations on the standard error device file descriptor symbol 2, and this issue is not present in safe mode.
-
-    he general mode supports semaphore capture in scripts, while the safe mode does not support it.
+    The normal mode supports semaphore processing in scripts, while the safe mode does not support it.
 
     The normal mode supports external parameter calls and human-machine interaction for all scripting languages, while the safe mode only supports shells that can define function syntax.
 
     The safe mode human-machine interaction ```read input``` needs to be changed to ```read input</dev/tty```, and the general mode does not require code modification.
 
-    The support for script language types in safe mode is different from that in normal mode. You can check whether the operating system supports it by running ```test/run.sh```.
+    The safe mode and normal mode support different script language types, which can be checked by running ```test/run.sh```.
 
 - Fix arguments 0
     
-    Fix arguments 0  supports ```fish```, ```zsh```, ```perl```, ```python```, ```javascript```, ```lua```, ```ruby```, orresponding to the uppercase letters of these scripts.
+    Fix arguments 0  supports ```fish```, ```zsh```, ```perl```, ```python```, ```javascript```, ```lua```, ```ruby```. The type is language uppercase letters.
 
-    In addition to built-in fix types, custom file fix can also be used. Custom file format：```？```Indicates parameter 0 value, line breaks must be explicitly used```\n```, Double quotes require an escape character ```\```.Specific reference ``` test/fix.txt```.
+    In addition to built-in fix types, custom file fix can also be used. Custom file format：```？```Indicates parameter 0 value, line breaks must be explicitly used```\n```, Double quotes require an escape character ```\```.Reference ```test/fix.txt```.
 
 ### Untraceable
-Version 0.3  and above has added untraceable and tested the following tools for untraceable
+Version 0.3 or above has added untraceable and tested the following tools for untraceable
 
 OS| TOOL|SUPPORTED
 ------|------|------
@@ -77,6 +75,11 @@ DragonFly 6.4|gdb|NO
 macOS 13|lldb|NO
 
 ### History
+
+- v1.01 2024-06-02
+
+  Remove special handling of FreeBSD
+
 - v1.0 2024-06-01
 
   Add support for non SHELL scripting languages

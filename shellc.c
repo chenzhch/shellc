@@ -5,7 +5,7 @@
  * Author: ChenZhongChao
  * E-Mail: nbczc@163.com
  * Date: 2023-12-25
- * Version: 1.0
+ * Version: 1.01
  * Github: https://github.com/chenzhch/shellc.git
  * Gitee: https://gitee.com/chenzhch/shellc.git
  */
@@ -228,6 +228,7 @@ static const char *fourth[] = {
     "    }",
     "    free(str);",
     "    memset(dev, 0, sizeof(dev));",
+    "    sprintf(dev, \"/dev/fd/%d\", file[0]);",
     0
 };
 
@@ -883,13 +884,7 @@ int main(int argc, char **argv)
     if (safe_flag) { 
         while (fourth_safe[i]) fprintf(out, "%s\n", fourth_safe[i++]);        
     } else {
-        while (fourth[i]) fprintf(out, "%s\n", fourth[i++]);
-        if(!strcmp(sysinfo.sysname, "FreeBSD")) {
-            fprintf(out, "    sprintf(dev, \"/dev/fd/2\");\n");
-            fprintf(out, "    dup2(file[0], 2);\n");
-        } else {
-           fprintf(out, "    sprintf(dev, \"/dev/fd/%cd\", file[0]);\n", '%');
-        }             
+        while (fourth[i]) fprintf(out, "%s\n", fourth[i++]);               
     }
 
     /*Write to the fix code section*/    
@@ -1010,7 +1005,7 @@ int main(int argc, char **argv)
    
     fflush(out);
     fclose(out);
-    printf("Ok! Make binary by \"cc %s -s -O2 -o %s.x\"\n", outname, inname);
+    printf("Ok! Make binary by \"cc %s -O2 -o %s.x\"\n", outname, inname);
     free(bitmap);
     free(code_text);
     free(obscure_text);
