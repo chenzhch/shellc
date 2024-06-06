@@ -12,11 +12,11 @@ cc example.sh.c -O2 -o example
 The generated C code is ```example.sh.c```, which is the original file name followed by ```.c```.
 For programs used in production environments, it is recommended to add the parameter ```-s``` or use the ```strip``` command after compilation to remove the symbol table in the executable program, increasing the difficulty of disassembly and reverse engineering.
 
-I have tried the tools ```shc``` and ```shellcrypt```, which can compile shell scripts into executable programs.  The main problems are:
-- The ```shc``` command actually calls the ```sh -c``` command.  The source code can be seen through the ```ps -ef``` command. The length of the shell script cannot exceed ARG_ MAX .
-- ```Shellcrypt``` does not support external parameter input, and the encryption algorithm is relatively simple.  The generated executable program can be decrypted by XORing with ```0x000C``` to obtain the source code.
+I have tried the tools ```shc```, which can compile shell scripts into executable programs.  The main problems are:
 
-In addition to solving the problems of the above two tools, ```shellc```  also adds code obfuscation, randomly generating effective character position calculation functions, random character encryption, and debugging to increase the complexity of disassembly and reverse engineering.
+The ```shc``` command actually calls the ```sh -c``` command.  The source code can be seen through the ```ps -ef``` command. The length of the shell script cannot exceed ARG_MAX .
+
+Shellc not only solves the problems that exist in ```shc```, ```shellc```  also adds code obfuscation, randomly generating effective character position calculation functions, random character encryption, and debugging to increase the complexity of disassembly and reverse engineering.If further difficulty is required, professional tools such as ```obfuscator-llvm``` can be used to further obfuscate the generated C code.
 
 Version 1.0 or above not only support shell, but also other scripting languages, which can completely replace  ```shc```.
 At present, the program has practical applications in ```AIX```, ```UNIX```, ```Linux``` environments. It is recommended to conduct comprehensive testing on the compiled program to prevent production failures.
@@ -76,6 +76,10 @@ macOS 13|lldb|NO
 
 ### History
 
+- v1.02 2024-06-06
+
+  Removing macro definitions from generated code makes it easier for professional tools to generate more complex and confusing code
+
 - v1.01 2024-06-02
 
   Remove special handling of FreeBSD
@@ -108,4 +112,3 @@ macOS 13|lldb|NO
 
   Initial version 
  
-

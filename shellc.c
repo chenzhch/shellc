@@ -5,7 +5,7 @@
  * Author: ChenZhongChao
  * E-Mail: nbczc@163.com
  * Date: 2023-12-25
- * Version: 1.01
+ * Version: 1.0
  * Github: https://github.com/chenzhch/shellc.git
  * Gitee: https://gitee.com/chenzhch/shellc.git
  */
@@ -250,8 +250,27 @@ static const char *fourth_safe[] = {
     "        fprintf(stderr, \"Error: Command %s not found\\n\", command);",
     "        return(1);",
     "    }",
+    "    free(name);"
     "    if (argc > 1) {",
-    "       fputs(\"__shellc_main__() { \", pipe);", 
+    "        srand(time(0));",
+    "        length = rand() % 9 + 16;",
+    "        name = malloc((size_t) length);",
+    "        memset(name, 0, length);",
+    "        for (i = 0; i < length - 1; i++) {",     
+    "            switch(rand() % 3) {",
+    "                case 0:",
+    "                    sprintf(name + i, \"%c\", rand() % 26 + 65);",
+    "                    break;",
+    "                case 1:",    
+    "                    sprintf(name + i, \"%c\", rand() % 26 + 97);",
+    "                    break;", 
+    "                default:",
+    "                    sprintf(name + i, \"%c\", 95);",
+    "                    break;",           
+    "            }",
+    "        }",
+    "        fputs(name, pipe);",
+    "        fputs(\"() { \", pipe);",
     "    }",  
     0
 };
@@ -272,9 +291,8 @@ static const char *fifth[] = {
     "    }",
     "    args[j] = 0;",  
     "    if ((pid = fork()) == 0) {",  
-    "       write_script(file[1]);", 
-    "       close(file[1]);",
     "       close(file[0]);",
+    "       write_script(file[1]);", 
     "       return(0);",
     "    } else if (pid < 0) {",
     "        perror(\"Failed to fork\");",
@@ -292,7 +310,10 @@ static const char *fifth[] = {
 static const char *fifth_safe[] = {
     "    write_script(pipe);",
     "    if (argc > 1) {",
-    "        fputs(\" } ; __shellc_main__ \", pipe);", 
+    "        fputs(\" } ; \", pipe);",
+    "        fputs(name, pipe);",
+    "        free(name);",
+    "        fputc(' ', pipe);",
     "    }",
     "    for(i = 1; i < argc; i++) {",
     "        fputs(\" \\\"\", pipe);",
@@ -581,7 +602,7 @@ int main(int argc, char **argv)
         }
     }
     if (input_flag != 1 || command_flag != 1 || fix_flag > 1  || trace_flag > 1 || safe_flag > 1) {
-        fprintf(stderr, "Usage1: %s command inputfile [-t] [-s] [-f fix-argv0]\n", argv[0]);
+        fprintf(stderr, "Usage: %s command inputfile [-t] [-s] [-f fix-argv0]\n", argv[0]);
         return(1);    
     }
 
@@ -728,19 +749,19 @@ int main(int argc, char **argv)
         fprintf(out, "#include <sys/ptrace.h>\n");
     }       
      
-    /*Macro definitions are generated based on the calculation path*/
+    /*Calculation path function*/
     for (i = 0; i < 32; i++) {
         j = 0;
         while (route[i][j] != 0) {
             if(j == 0){
-                fprintf(out, "#define F%d(a, b) (\\\n", i + 1);
+                fprintf(out, "long f%d(long a, long b) \n{\n    return (\n", i + 1);
             }
             memset(str, 0, (size_t) sizeof(str));
             macro(route[i][j], x[i][j], y[i][j], str);
-            fprintf(out, "   %s%s\\\n", j == 0 ? " ":" +", str);
+            fprintf(out, "       %s%s\n", j == 0 ? " ":" +", str);
             j++;
         }
-        fprintf(out, ")\n\n");
+        fprintf(out, "    );\n}\n\n");
     }
     
     /*Character mask calculation function*/
@@ -748,23 +769,15 @@ int main(int argc, char **argv)
         j = 0;
         while (algorithm[i][j] != 0) {
             if(j == 0){
-                fprintf(out, "#define F%d(a, b) labs(\\\n", 32 + i + 1);
+                fprintf(out, "long f%d(long a, long b) \n{\n    return labs(\n", 32 + i + 1);
             }
-            fprintf(out, "   %s(%s%c%s)\\\n", j == 0 ? " ":" +", number[i][j * 2], algorithm[i][j], number[i][j * 2 + 1]);
+            fprintf(out, "       %s(%s%c%s)\n", j == 0 ? " ":" +", number[i][j * 2], algorithm[i][j], number[i][j * 2 + 1]);
             j++;
         }
-        fprintf(out, ")\n\n");
+        fprintf(out, "    );\n}\n\n");
     }
-
-    /*Generate a call function*/
-    for (i = 0; i < 64; i++) {
-        fprintf(out, "long f%d(long a, long b)\n", i + 1);
-        fprintf(out, "{\n");
-        fprintf(out, "    return(F%d(a, b));\n", i + 1);
-        fprintf(out, "}\n\n");
-    }        
-    
-    fprintf(out, "static const char *command = \"%s\";\n", command);   
+        
+    fprintf(out, "static const char *command = \"%s\";\n\n", command);   
     
     /*Write to the data section*/         
     fprintf(out, "static const char *data[] = {\n");
