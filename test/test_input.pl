@@ -1,0 +1,10 @@
+use strict;
+print("0:$0\n");
+print("1:$ARGV[0]\n");
+print("2:$ARGV[1]\n");
+print("input data:");
+my $device;
+open($device, '<', '/dev/tty');
+my $data = <$device>;
+chomp($data); 
+print("data is $data\n");

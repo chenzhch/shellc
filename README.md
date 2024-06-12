@@ -23,17 +23,19 @@ At present, the program has practical applications in ```AIX```, ```UNIX```, ```
 ### User manual
 - Generate C code command
  
-   ``` shellc command inputfile [-t] [-s] [-f fix-argv0] ```  
+   ```shellc command inputfile [-t] [-s] [-f fix-format] [-e fix-file]```   
 
-    command：    Execute script commands, such ```sh```,```perl```,```python```,```node```,```ruby```,```Rscript```,```php```, etc.
+    command：   Execute script commands, such ```sh```,```perl```,```python```,```node```,```ruby```,```Rscript```,```php```, etc.
 
     inputfile： Script file name
 
-    -t option：    For systems that do not support anti debugging functionality, this option is required for generated code.
+    -t option： For systems that do not support anti debugging functionality, this option is required for generated code.
 
-    -s option：    Generate C code mode, the - s option uses safe mode, and defaults to normal mode.
+    -s option： Generate C code mode, the -s option uses safe mode, and defaults to normal mode.
 
-    -f option：    Fix parameter 0 value.
+    -f option： Fix parameter 0 value or safe mode external parameter.
+
+    -e option： Fix parameter 0 value by custom external file.
 
 - Code pattern differences
 
@@ -41,17 +43,19 @@ At present, the program has practical applications in ```AIX```, ```UNIX```, ```
 
     The normal mode supports semaphore processing in scripts, while the safe mode does not support it.
 
-    The normal mode supports external parameter calls and human-machine interaction for all scripting languages, while the safe mode only supports shells that can define function syntax.
+    The normal mode supports human-machine interaction in all scripting languages, while some languages in safe mode do not support it, such as ```csh```,```tcsh```.
 
-    The safe mode human-machine interaction ```read input``` needs to be changed to ```read input</dev/tty```, and the general mode does not require code modification.
+    The safe mode human-machine interaction needs to be modified to read from the device ```/dev/tty```. such as shell script ```read input``` needs to be changed to ```read input</dev/tty```, For other languages, refer to the ```test/test_input.*```. The normal mode does not require code modification.
 
     The safe mode and normal mode support different script language types, which can be checked by running ```test/run.sh```.
 
-- Fix arguments 0
+- Fix arguments 
     
-    Fix arguments 0  supports ```BASH```, ```FISH```, ```ZSH```, ```PERL```, ```PYTHON```, ```JAVASCRIPT```, ```LUA```, ```RUBY```. 
+    Fix arguments 0 supports ```BASH```, ```FISH```, ```ZSH```, ```PERL```, ```PYTHON```, ```JAVASCRIPT```, ```LUA```, ```RUBY```. 
 
-    In addition to built-in fix types, custom file fix can also be used. Custom file format：```？```Indicates parameter 0 value, line breaks must be explicitly used```\n```, Double quotes require an escape character ```\```.Reference ```test/fix.txt```.
+    In addition to built-in fix format, external file can also be used to fix arguments 0. File format：```?```Indicates parameter 0 value, line breaks must be explicitly used```\n```, Double quotes require an escape character ```\```.Reference ```test/fix.txt```.
+
+    Safe mode non definable function shell language external parameter call, requires specifying fix format, such as ```FISH```, ```PERL```,```PYTHON```, ```JAVASCRIPT```,```LUA```, ```RUBY```, ```CSH```, ```TCLSH```, ```PHP```,```RC```.
 
 ### Untraceable
 Version 0.3 or above has added untraceable and tested the following tools for untraceable
@@ -75,6 +79,10 @@ DragonFly 6.4|gdb|NO
 macOS 13|lldb|NO
 
 ### History
+
+- v1.1 2024-06-12
+
+  Expand functions in safe mode
 
 - v1.02 2024-06-06
 

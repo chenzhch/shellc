@@ -5,7 +5,7 @@
  * Author: ChenZhongChao
  * E-Mail: nbczc@163.com
  * Date: 2023-12-25
- * Version: 1.0
+ * Version: 1.1
  * Github: https://github.com/chenzhch/shellc.git
  * Gitee: https://gitee.com/chenzhch/shellc.git
  */
@@ -67,18 +67,42 @@ static const char *format[] = {
     "JAVASCRIPT",
     "LUA",
     "RUBY",
+    "CSH",
+    "TCLSH",
+    "PHP",
+    "RC",
     0
 };
 
-static const char *fix_code[][2] = {
-    {"BASH_ARGV0='?';", 0}, /*bash*/
-    {"set 0 '?';", 0}, /*fish*/
-    {"0='?';", 0}, /*zsh*/
-    {"$0='?';", 0}, /*perl*/
-    {"import sys; sys.argv[0] = '''?''';", 0}, /*python*/
-    {"__filename = `?`; process.argv[1] = `?`;", 0}, /*javascript*/
-    {"arg[0] = '?';", 0}, /*lua*/
-    {"$0='?';", 0}, /*ruby*/
+static const char *fix_code[][2] = { 
+    {"BASH_ARGV0='?'; ", 0}, /*bash*/
+    {"set 0 '?'; ", 0}, /*fish*/
+    {"0='?'; ", 0}, /*zsh*/
+    {"$0='?'; ", 0}, /*perl*/
+    {"import sys; sys.argv[0] = '''?'''; ", 0}, /*python*/
+    {"__filename = `?`; process.argv[1] = `?`; ", 0}, /*javascript*/
+    {"arg[0] = '?'; ", 0}, /*lua*/
+    {"$0='?'; ", 0}, /*ruby*/
+    {0, 0}, /*csh*/
+    {0, 0}, /*tclsh*/
+    {"$argv[0] = '?'; ", 0}, /*php*/
+    {0, 0}, /*rc*/
+    {0, 0}
+};
+
+static const char *arg_code[][2] = { 
+    {0, 0}, /*bash*/
+    {"sprintf(name, \"set -a argv '%s'; \", argv[i]);", 0}, /*fish*/
+    {0, 0}, /*zsh*/
+    {"sprintf(name, \"push @ARGV, '%s'; \", argv[i]);", 0}, /*perl*/
+    {"sprintf(name, \"sys.argv.append('''%s'''); \", argv[i]);", 0}, /*python*/
+    {"sprintf(name, \"process.argv.push(`%s`); \", argv[i]);", 0}, /*javascript*/
+    {"sprintf(name, \"table.insert(arg, '%s'); \", argv[i]);", 0}, /*lua*/
+    {"sprintf(name, \"ARGV.push('%s'); \", argv[i]);", 0}, /*ruby*/
+    {"sprintf(name, \"set argv = ($argv %s); \", argv[i]);", 0}, /*csh*/
+    {"sprintf(name, \"set argv [concat $argv %s]; \", argv[i]);", 0}, /*tclsh*/
+    {"sprintf(name, \"array_push($argv, '%s'); \", argv[i]);", 0}, /*php*/
+    {"sprintf(name, \"* = ($* %s); \", argv[i]);", 0}, /*rc*/
     {0, 0}
 };
 
@@ -88,7 +112,6 @@ static const char *sysname[] = {
     "DragonFly",
     0
 };
-
 
 static const char *head[] = {
     "#include <stdio.h>",
@@ -146,7 +169,6 @@ static const char *first[] = {
     "            if (strlen(str) == k - 1) {",
     0
 };
- 
 
 static const char *sencod[] = {
     "                memset(str, 0, (size_t) k);",
@@ -194,7 +216,7 @@ static const char *third[] = {
     "            strcat(name, command);",
     "            if (access(name, X_OK) == 0) {",
     "                memset(fullname, 0, (size_t) strlen(fullname));",
-    "                strcpy(fullname, name);"
+    "                strcpy(fullname, name);",
     "                free(name);",
     "                return(0);",
     "            }",
@@ -211,7 +233,6 @@ static const char *third[] = {
     "",
     0
 };
-
 
 static const char *fourth[] = {
     "int handler(int argc, char **argv)",
@@ -250,7 +271,12 @@ static const char *fourth_safe[] = {
     "        fprintf(stderr, \"Error: Command %s not found\\n\", command);",
     "        return(1);",
     "    }",
-    "    free(name);"
+    "    free(name);",
+    "",
+    0
+};
+
+static const char *sh_start[] = {
     "    if (argc > 1) {",
     "        srand(time(0));",
     "        length = rand() % 9 + 16;",
@@ -274,7 +300,6 @@ static const char *fourth_safe[] = {
     "    }",  
     0
 };
-
 
 static const char *fifth[] = {
     "    args = (char **) malloc((argc + 8) * sizeof(char *));",
@@ -304,11 +329,11 @@ static const char *fifth[] = {
     "    perror(\"Failed to execvp\");",
     "    return(1);",  
     "}",
+    "",
     0
 };
 
-static const char *fifth_safe[] = {
-    "    write_script(pipe);",
+static const char *sh_end[] = {
     "    if (argc > 1) {",
     "        fputs(\" } ; \", pipe);",
     "        fputs(name, pipe);",
@@ -320,6 +345,25 @@ static const char *fifth_safe[] = {
     "        fwrite(argv[i], sizeof(char), strlen(argv[i]), pipe);",
     "        fputc('\"', pipe);",
     "    }",
+    0
+};
+
+static const char *arg_start[] = {    
+    "    for(i = 1; i < argc; i++) {",
+    "        length = strlen(argv[i]) + 128;",
+    "        name = malloc(length);",
+    "        memset(name, 0, length);",
+    0
+};
+ 
+static const char *arg_end[] = {
+    "        fwrite(name, sizeof(char), strlen(name), pipe);",
+    "        free(name);",
+    "    }",      
+    0
+};
+
+static const char *fifth_safe[] = {
     "    if(pclose(pipe)) {",
     "        return(1);",
     "    }",
@@ -457,8 +501,8 @@ long binary_to_int(char *str, int len)
     return(val);
 }
 
-/*Generate macro definitions*/
-void macro(int order, int x, int y, char *str)
+/*Generate function definition*/
+void function(int order, int x, int y, char *str)
 {
     switch(order) {
         case 1:  sprintf(str, "((~%d|~a)>(~%d|~b)?b-%d:a-%d)", x, y, x, y); break;
@@ -545,69 +589,101 @@ int main(int argc, char **argv)
     int code_length, obscure_length, length, pos;
     int fix_pos = -1;
     char *code_text, *obscure_text, *text;
-    char *bitmap, *inname = NULL, *outname, *command = NULL, *fix_format = NULL;
+    char *bitmap, *inname = NULL, *outname, *command = NULL;
+    char *fix_format = NULL, *file_name = NULL;
     char str[1024];
     long result, offset1, offset2;
     long salt1, salt2;
-    int size, digit;   
+    int size, digit, opt;   
     int route[32][17], x[32][16], y[32][16];
     char *operators = "+-*/%&|^";
     char number[32][32][8];
     char algorithm[32][17];
     int i, j, k, loop, mode;
-    int trace_flag = 0, fix_flag = 0, input_flag = 0, command_flag = 0;   
+    int trace_flag = 0, fix_flag = 0, input_flag = 0, command_flag = 0, file_flag = 0;   
     int self_flag = 0, safe_flag = 0;    
     struct utsname sysinfo;
     struct stat status; 
     char *self_name = "/proc/self/status";
+    char *option = "f:e:tsh";    
+    char **args = (char **) malloc((argc + 1) * sizeof(char *));
 
+    j = 0;
+    args[j++] = strdup(argv[0]);
     for (i = 1; i < argc; i++) {
-        if (!strcmp(argv[i], "-h")) {
-            printf("%s: Convert script into C code\n", argv[0]);
-            printf("Usage: %s command inputfile [-t] [-s] [-f fix-argv0]\n", argv[0]);
-            printf("Option: \n");
-            printf("    -t    Make traceable binary\n"); 
-            printf("    -s    Using safe mode\n"); 
-            printf("    -f    Fix arguments 0\n");
-            printf("    -h    Display help and return\n");
-            return(0);
+        if (argv[i][0] == '-') {
+            if (strlen(argv[i]) > 1) {
+                for (k = 0; k < strlen(option); k++) {
+                    if(option[k] == argv[i][1]) break;
+                }
+                args[j++] = strdup(argv[i]);
+                argv[i] = NULL; 
+                if (option[k + 1] == ':') {
+                    args[j++] = strdup(argv[++i]);
+                    argv[i] = NULL;
+                }
+            } else {
+                args[j++] = strdup(argv[i]);
+                argv[i] = NULL;  
+            }
         }
     }
-
-    for(i = 1; i < argc; i++) {
-        if (argv[i][0] == '-' && strcmp(argv[i], "-t") && strcmp(argv[i], "-f") && strcmp(argv[i], "-s")) {
-            fprintf(stderr, "Error: invalid option %s\n", argv[i]);
-            return(1);
-        }       
-    }
-
     for (i = 1; i < argc; i++) {
-        if (!strcmp(argv[i], "-t")) {
-            trace_flag++;
-        } else if (!strcmp(argv[i], "-s")) {
-            safe_flag++;
-        } else if (!strcmp(argv[i], "-f")) {
-            fix_flag++;       
-            if (i == argc - 1) {
-                fprintf(stderr, "Error: option %s requires an argument\n", argv[i]);
+        if(argv[i] != NULL) args[j++] = strdup(argv[i]);        
+    }
+  
+    while ((opt = getopt(argc, args, option)) != -1) {
+        switch (opt) {
+            case 'h':
+                printf("%s: Convert script into C code\n", argv[0]);
+                printf("Usage: %s command inputfile [-t] [-s] [-f fix-format] [-e fix-file] \n", argv[0]);
+                printf("Option: \n");
+                printf("    -t    Make traceable binary\n"); 
+                printf("    -s    Using safe mode\n"); 
+                printf("    -f    Fix arguments format\n");
+                printf("    -e    Fix arguments 0 by external file\n");
+                printf("    -h    Display help and return\n");
+                return(0);
+            case 't':
+                trace_flag++;
+                break;
+            case 's':
+                safe_flag++;
+                break;    
+            case 'f':
+                fix_flag++;
+                fix_format = strdup(optarg);
+                break; 
+            case 'e':
+                file_flag++;
+                file_name = strdup(optarg);
+                break;
+            case '?':
                 return(1);
-            }
-            fix_format = strdup(argv[++i]);
-        } else if (!command_flag) {            
-            command = strdup(argv[i]);            
+            default:
+                fprintf(stderr, "Usage: %s command inputfile [-t] [-s] [-f fix-format] [-e fix-file]\n", argv[0]);
+                return(1);   
+        }
+    }    
+
+    for (i = optind; i < argc; i++) {
+        if (!command_flag) {            
+            command = strdup(args[i]);            
             command_flag = 1;    
         } else {           
-            inname = strdup(argv[i]);
+            inname = strdup(args[i]);
             input_flag++; 
-        }
+        }        
     }
-    if (input_flag != 1 || command_flag != 1 || fix_flag > 1  || trace_flag > 1 || safe_flag > 1) {
-        fprintf(stderr, "Usage: %s command inputfile [-t] [-s] [-f fix-argv0]\n", argv[0]);
+     
+    if (input_flag != 1 || command_flag != 1 || fix_flag > 1  
+        || trace_flag > 1 || safe_flag > 1 || file_flag > 1) {
+        fprintf(stderr, "Usage: %s command inputfile [-t] [-s] [-f fix-format] [-e fix-file]\n", argv[0]);
         return(1);    
     }
 
     /*Running environment check*/
-    if(which(command)) {
+    if (which(command)) {
         return(1);
     }  
 
@@ -626,9 +702,7 @@ int main(int argc, char **argv)
   	        i++;
         }     
     }
-
     
-
     i = 0;
     if (fix_flag) {
         while (format[i]) {
@@ -638,11 +712,16 @@ int main(int argc, char **argv)
             } 
             i++;  
         } 
-        if(fix_pos == -1 && access(fix_format, R_OK)){
-            fprintf(stderr, "Error: fix-arg0 file %s is not exists\n", fix_format);
+        if (fix_pos == -1) {
+            fprintf(stderr, "Error: invalid fix format %s\n", fix_format);
             return(1);     
         }
     }  
+
+    if (file_flag && access(file_name, R_OK)) {       
+        fprintf(stderr, "Error: fix file %s is not exists\n", fix_format);
+        return(1);          
+    }
     
     /*Self file format*/
     if(access(self_name, R_OK) == 0) {
@@ -659,8 +738,7 @@ int main(int argc, char **argv)
         }
         fclose(self_file);
     }
-    
-    
+        
     in = fopen(inname, "r");
     if (in == NULL) {
         fprintf(stderr, "Failed to open the file: %s\n", inname);
@@ -757,7 +835,7 @@ int main(int argc, char **argv)
                 fprintf(out, "long f%d(long a, long b) \n{\n    return (\n", i + 1);
             }
             memset(str, 0, (size_t) sizeof(str));
-            macro(route[i][j], x[i][j], y[i][j], str);
+            function(route[i][j], x[i][j], y[i][j], str);
             fprintf(out, "       %s%s\n", j == 0 ? " ":" +", str);
             j++;
         }
@@ -895,103 +973,136 @@ int main(int argc, char **argv)
     
     i = 0;
     if (safe_flag) { 
-        while (fourth_safe[i]) fprintf(out, "%s\n", fourth_safe[i++]);        
+        while (fourth_safe[i]) fprintf(out, "%s\n", fourth_safe[i++]);
+        i = 0;
+        if (!fix_flag || !arg_code[fix_pos][0]) {
+            while(sh_start[i]) fprintf(out, "%s\n", sh_start[i++]); 
+        }        
     } else {
         while (fourth[i]) fprintf(out, "%s\n", fourth[i++]);               
     }
 
     /*Write to the fix code section*/    
-    if (fix_flag) {
-        if (fix_pos != -1) {     
-            i = 0;
-            k = 0; 
-            length = 0;      
-            while (fix_code[fix_pos][i]) {
-                length += strlen(fix_code[fix_pos][i]);
-                for (j = 0; j < strlen(fix_code[fix_pos][i]); j++) {
-                    if (fix_code[fix_pos][i][j] == '?') {
-                        k++;        
-                    }
-                }
-                i++; 
+    if (fix_flag) {   
+        i = 0;
+        k = 0; 
+        length = 0; 
+        if (safe_flag) {
+            if (fix_format != NULL && !strcmp(fix_format, "PHP")) {
+                fprintf(out,  "    fwrite(\"<?php \", sizeof(char), 6, pipe);\n");    
+            } else  if (fix_format != NULL && !strcmp(fix_format, "LUA")) {
+                fprintf(out,  "    fwrite(\"arg = {}; \", sizeof(char), 10, pipe);\n");    
             }
-            fprintf(out, "    str = (char *) malloc(%d + strlen(argv[0]) * %d);\n", length + 8, k);            
-            i = 0;
-            while (fix_code[fix_pos][i]) {
-                fprintf(out, "    sprintf(str, \"");  
-                k = 0;             
-                for (j = 0; j < strlen(fix_code[fix_pos][i]); j++) {
-                    if (fix_code[fix_pos][i][j] == '?') {
-                        fputc('%', out);
-                        fputc('s', out);
-                        k++; 
-                    } else {
-                        fputc(fix_code[fix_pos][i][j], out);
-                    }
-                }
-                fputc('"', out);
-                for(j = 0; j < k; j++) {
-                    fprintf(out, ", argv[0]");
-                }           
-                fprintf(out, ");\n");
-                if (safe_flag) {
-                    fprintf(out,  "    fwrite(str, sizeof(char), strlen(str), pipe);\n");
-                } else {
-                    fprintf(out,  "    write(file[1], str, strlen(str));\n");
-                }
-                i++;
-            }                     
         } else {
-            fix_file = fopen(fix_format, "r");              
-            if (fix_file == NULL) {
-                fprintf(stderr, "Failed to open the fix file: %s\n", fix_format);
-                return(1);
+            if (fix_format != NULL && !strcmp(fix_format, "PHP")) {
+                fprintf(out,  "    write(file[1], \"<?php \", 6);\n");    
             }
-
-            stat(fix_format, &status);
-            length = status.st_size;
-            k = 0;
-            for (j = 0; j < status.st_size; j++) {
-                if (fgetc(fix_file) == '?') {
-                   k++;        
+        }     
+        while (fix_code[fix_pos][i]) {
+            length += strlen(fix_code[fix_pos][i]);
+            for (j = 0; j < strlen(fix_code[fix_pos][i]); j++) {
+                if (fix_code[fix_pos][i][j] == '?') {
+                    k++;        
                 }
             }
-            fprintf(out, "    str = (char *) malloc(%d + strlen(argv[0]) * %d);\n", length + 8, k);
-
-            rewind(fix_file);
-            while (fgets(str, sizeof(str), fix_file)) {
-                fprintf(out, "    sprintf(str, \"");
-                k = 0;
-                for (j = 0; j < strlen(str) - 1; j++) {
-                    if (str[j] == '?') {
-                       fputc('%', out);
-                       fputc('s', out);  
-                       k++;      
-                    } else {
-                        fputc(str[j], out);
-                    }
-                }
-                fputc('"', out);
-                for(j = 0; j < k; j++) {
-                    fprintf(out, ", argv[0]");
-                }
-                fprintf(out, ");\n");
-                if (safe_flag) {
-                    fprintf(out,  "    fwrite(str, sizeof(char), strlen(str), pipe);\n");
-                } else {
-                    fprintf(out,  "    write(file[1], str, strlen(str));\n");
-                }
-            }
-            fclose(fix_file);
+            i++; 
         }
-        fprintf(out, "    free(str);\n");   
+        fprintf(out, "    str = (char *) malloc(%d + strlen(argv[0]) * %d);\n", length + 8, k);            
+        i = 0;
+        while (fix_code[fix_pos][i]) {
+            fprintf(out, "    sprintf(str, \"");  
+            k = 0;             
+            for (j = 0; j < strlen(fix_code[fix_pos][i]); j++) {
+                if (fix_code[fix_pos][i][j] == '?') {
+                    fputc('%', out);
+                    fputc('s', out);
+                    k++; 
+                } else {
+                    fputc(fix_code[fix_pos][i][j], out);
+                }
+            }
+            fputc('"', out);
+            for(j = 0; j < k; j++) {
+                fprintf(out, ", argv[0]");
+            }           
+            fprintf(out, ");\n");
+            if (safe_flag) {                
+                fprintf(out,  "    fwrite(str, sizeof(char), strlen(str), pipe);\n");
+            } else {                
+                fprintf(out,  "    write(file[1], str, strlen(str));\n");
+            }
+            i++;                   
+        }
+        fprintf(out, "    free(str);\n");  
+    }
+
+    if(file_flag) {
+        fix_file = fopen(file_name, "r");              
+        if (fix_file == NULL) {
+            fprintf(stderr, "Failed to open the fix file: %s\n", file_name);
+            return(1);
+        }
+        stat(file_name, &status);
+        length = status.st_size;
+        k = 0;
+        for (j = 0; j < status.st_size; j++) {
+            if (fgetc(fix_file) == '?') {
+                k++;        
+            }
+        }
+        fprintf(out, "    str = (char *) malloc(%d + strlen(argv[0]) * %d);\n", length + 8, k);
+        rewind(fix_file);
+        while (fgets(str, sizeof(str), fix_file)) {
+            fprintf(out, "    sprintf(str, \"");
+            k = 0;
+            for (j = 0; j < strlen(str) - 1; j++) {
+                if (str[j] == '?') {
+                    fputc('%', out);
+                    fputc('s', out);  
+                    k++;      
+                } else {
+                    fputc(str[j], out);
+                }
+            }
+            fputc('"', out);
+            for(j = 0; j < k; j++) {
+                fprintf(out, ", argv[0]");
+            }
+            fprintf(out, ");\n");
+            if (safe_flag) {
+                fprintf(out,  "    fwrite(str, sizeof(char), strlen(str), pipe);\n");
+            } else {
+                fprintf(out,  "    write(file[1], str, strlen(str));\n");
+            }
+        }
+        fclose(fix_file);
+        fprintf(out, "    free(str);\n"); 
     }
 
     i = 0;
-    if (safe_flag) { 
-        while (fifth_safe[i]) fprintf(out, "%s\n", fifth_safe[i++]);  
-    } else {        
-        while (fifth[i]) fprintf(out, "%s\n", fifth[i++]); 
+    if (safe_flag) {         
+        i = 0;
+        if (!fix_flag || !arg_code[fix_pos][0]) {
+            fprintf(out, "    write_script(pipe);\n");
+            while(sh_end[i]) fprintf(out, "%s\n", sh_end[i++]); 
+        }else {              
+            while(arg_start[i]) fprintf(out, "%s\n", arg_start[i++]); 
+            i = 0;
+            while(arg_code[fix_pos][i]) fprintf(out, "        %s\n", arg_code[fix_pos][i++]); 
+            i = 0;
+            while(arg_end[i]) fprintf(out, "%s\n", arg_end[i++]); 
+            if(fix_format != NULL && !strcmp(fix_format, "PHP")) {
+                fprintf(out,  "    fwrite(\"//\", sizeof(char), 2, pipe);\n");    
+            }
+            fprintf(out, "    write_script(pipe);\n");             
+        }      
+        i = 0;        
+        while (fifth_safe[i]) fprintf(out, "%s\n", fifth_safe[i++]); 
+    } else {     
+        if(fix_format != NULL && !strcmp(fix_format, "PHP")) {
+            fprintf(out,  "    write(file[1], \"//\", 2);\n");    
+        }   
+        while (fifth[i]) fprintf(out, "%s\n", fifth[i++]);         
     }
 
     /*Write to the main function section*/

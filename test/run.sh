@@ -18,12 +18,14 @@ ok()
     fi    
 }
 
-one()
+
+exe()
 {    
     if [ -f ./$1.c ]; then    
-        cc $1.c -o $1_$2.x; err "compile $1_$2.x" 
+        cc $1.c  -o $1_$2.x; err "compile $1_$2.x"
+        #cc $1.c -Wall -o $1_$2.x; err "compile $1_$2.x"  
         if [ -f ./$1_$2.x ]; then
-            ./$1_$2.x ; ok "run $1_$2.x" 
+            ./$1_$2.x 1 2; ok "run $1_$2.x" 
         fi 
     fi
     echo "Press any key to continue"
@@ -32,12 +34,13 @@ one()
     clear
 }
 
-exe()
+one()
 {    
     if [ -f ./$1.c ]; then    
-        cc $1.c -o $1_$2.x; err "compile $1_$2.x" 
+        cc $1.c  -o $1_$2.x; err "compile $1_$2.x" 
+        #cc $1.c -Wall -o $1_$2.x; err "compile $1_$2.x" 
         if [ -f ./$1_$2.x ]; then
-            ./$1_$2.x 1 1; ok "run $1_$2.x" 
+            ./$1_$2.x ; ok "run $1_$2.x" 
         fi 
     fi
     echo "Press any key to continue"
@@ -82,10 +85,31 @@ bat()
         $SHELLC $1 $2 -t -f $3; ok "create $2.c"
         exe $2 tf
         
-        echo "----[sample6:shellc $1 $2 -t -s -f $3]----"
+        echo "----[sample6:shellc $1 $2 -ts -f $3]----"
         rm -f $2.c
-        $SHELLC $1 $2 -t -s -f $3; ok "create $2.c"
+        $SHELLC $1 $2 -ts -f $3; ok "create $2.c"
         exe $2 sf
+    fi
+}
+
+fix()
+{
+          
+    if [ $# = 3 ]; then
+        echo "----[fix-file1:shellc $1 $2 -e $3]----"
+        rm -f $2.c
+        $SHELLC $1 $2 -e $3; ok "create $2.c"
+        exe $2 ue
+        
+        echo "----[fix-file2:shellc $1 $2 -t -e $3]----"
+        rm -f $2.c
+        $SHELLC $1 $2 -t -e $3; ok "create $2.c"
+        exe $2 te
+        
+        echo "----[fix-file3:shellc $1 $2 -ts -e $3]----"
+        rm -f $2.c
+        $SHELLC $1 $2 -ts -e $3; ok "create $2.c"
+        exe $2 se
     fi
 }
 
@@ -122,25 +146,36 @@ run()
     fi
 }
 
-saf ()
+inp ()
 {
     if [ $# != 2 ] && [ $# != 3 ];then 
         echo "Error sample:$@"
         exit 
     fi
-    if [ $# = 2 ] || [ $# = 3 ]; then
-        echo "----[safe1:shellc $1 $2 -t -s]----"
+
+    if [ $# = 2 ] ; then
+        echo "----[input1:shellc $1 $2 -t ]----"
         rm -f $2.c
-        $SHELLC $1 $2 -t -s; ok "create $2.c"
-        one $2 s
+        $SHELLC $1 $2 -t ; ok "create $2.c"
+        exe $2 fi
+
+        echo "----[input2:shellc $1 $2 -t -s ]----"
+        rm -f $2.c
+        $SHELLC $1 $2 -t -s ; ok "create $2.c"
+        exe $2 si
         
     fi 
-        
+            
     if [ $# = 3 ]; then
-        echo "----[safe2:shellc $1 $2 -t -s -f $3]----"
+        echo "----[input1:shellc $1 $2 -t -f $3]----"
+        rm -f $2.c
+        $SHELLC $1 $2 -t -f $3; ok "create $2.c"
+        exe $2 fi
+
+        echo "----[input2:shellc $1 $2 -t -s -f $3]----"
         rm -f $2.c
         $SHELLC $1 $2 -t -s -f $3; ok "create $2.c"
-        one $2 sf
+        exe $2 si
     fi
 }
 
@@ -162,62 +197,60 @@ bat bash test.sh BASH
 
 bat zsh test.sh ZSH
 #Red Hat 7.8 not support fix-arg0, but using safe mode is ok    
-                                       
 
 bat ksh test.sh
 
-bat sh test.fix fix.txt 
+bat fish test.fish FISH
 
-#The following does not support safe mode
+bat tcsh test.csh CSH
 
-run tsh test.csh
+bat csh test.csh CSH
 
-run tcsh test.csh
+bat tclsh test.tcl TCLSH
 
-run tclsh test.tcl
+bat fish test.fish FISH
 
-run csh test.csh
-#AIX7.1 SCO_UNIX5.0 not support csh
+bat perl test.pl PERL
 
-run lua test.lua LUA
+bat lua test.lua LUA
 
-run perl test.pl PERL
+bat python test.py PYTHON
 
-run python test.py PYTHON
+bat python3 test.py PYTHON
 
-run python3 test.py PYTHON
+bat node test.js JAVASCRIPT
 
-run node test.js JAVASCRIPT
+bat ruby test.rb RUBY
+
+bat php test.php PHP 
+
+#bat rc test.rc RC
+
+fix sh test.fix fix.txt 
 
 run Rscript test.R
 
-run ruby test.rb RUBY
+#The following test parameters and human-computer interaction 
 
-run php test.php 
+inp sh test_input.sh
 
+inp fish test_input.fish FISH
 
-#The following support safe mode, but not support parameters and human-computer interaction
-saf tsh test_safe.csh
+inp lua test_input.lua LUA
 
-saf tcsh test_safe.csh
+inp perl test_input.pl PERL
 
-saf tclsh test_safe.tcl
+inp python test_input.py PYTHON
 
-saf csh test_safe.csh
+inp python3 test_input.py PYTHON
 
-saf lua test_safe.lua LUA
+inp node test_input.js JAVASCRIPT
 
-saf perl test_safe.pl PERL
+inp ruby test_input.rb RUBY
 
-saf python test_safe.py PYTHON
+inp tclsh test_input.tcl TCLSH
 
-saf python3 test_safe.py PYTHON
-
-saf node test_safe.js JAVASCRIPT
-
-saf ruby test_safe.rb RUBY
-
-saf php test_safe.php 
+inp php test_input.php PHP
 
 echo "===============run sample complete==============="
 
