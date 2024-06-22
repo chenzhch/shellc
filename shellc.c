@@ -5,7 +5,7 @@
  * Author: ChenZhongChao
  * E-Mail: nbczc@163.com
  * Date: 2023-12-25
- * Version: 1.1
+ * Version: 1.2
  * Github: https://github.com/chenzhch/shellc.git
  * Gitee: https://gitee.com/chenzhch/shellc.git
  */
@@ -117,7 +117,6 @@ static const char *head[] = {
     "#include <stdio.h>",
     "#include <string.h>",
     "#include <stdlib.h>",
-    "#include <time.h>",
     "#include <signal.h>",
     "#include <unistd.h>",
     "#include <sys/types.h>",
@@ -148,7 +147,7 @@ static const char *first[] = {
     "        f33, f34, f35, f36, f37, f38, f39, f40, f41, f42, f43, f44, f45, f46, f47, f48,",
     "        f49, f50, f51, f52, f53, f54, f55, f56, f57, f58, f59, f60, f61, f62, f63, f64",
     "    };",
-    "    srand(time(0));",
+    "    srand(getpid());",
     "    i = 0;",
     "    memset(chr, 0, (size_t) sizeof(chr));",
     "    while (data[i]) {",
@@ -278,7 +277,7 @@ static const char *fourth_safe[] = {
 
 static const char *sh_start[] = {
     "    if (argc > 1) {",
-    "        srand(time(0));",
+    "        srand(getpid());",
     "        length = rand() % 9 + 16;",
     "        name = malloc((size_t) length);",
     "        memset(name, 0, length);",
@@ -590,7 +589,7 @@ int main(int argc, char **argv)
     int fix_pos = -1;
     char *code_text, *obscure_text, *text;
     char *bitmap, *inname = NULL, *outname, *command = NULL;
-    char *fix_format = NULL, *file_name = NULL;
+    char *fix_format = NULL, *file_name = NULL, *bit = NULL;
     char str[1024];
     long result, offset1, offset2;
     long salt1, salt2;
@@ -601,12 +600,13 @@ int main(int argc, char **argv)
     char algorithm[32][17];
     int i, j, k, loop, mode;
     int trace_flag = 0, fix_flag = 0, input_flag = 0, command_flag = 0, file_flag = 0;   
-    int self_flag = 0, safe_flag = 0;    
+    int self_flag = 0, safe_flag = 0, bit_flag = 0;    
     struct utsname sysinfo;
     struct stat status; 
     char *self_name = "/proc/self/status";
-    char *option = "f:e:tsh";    
+    char *option = "f:e:b:tsh";    
     char **args = (char **) malloc((argc + 1) * sizeof(char *));
+    char *usage = "command inputfile [-t] [-s] [-f fix-format] [-e fix-file] [-b 8|16|32|64]";
 
     j = 0;
     args[j++] = strdup(argv[0]);
@@ -619,7 +619,9 @@ int main(int argc, char **argv)
                 args[j++] = strdup(argv[i]);
                 argv[i] = NULL; 
                 if (option[k + 1] == ':') {
-                    args[j++] = strdup(argv[++i]);
+                    i++;
+                    if(i == argc) break;
+                    args[j++] = strdup(argv[i]);
                     argv[i] = NULL;
                 }
             } else {
@@ -636,12 +638,13 @@ int main(int argc, char **argv)
         switch (opt) {
             case 'h':
                 printf("%s: Convert script into C code\n", argv[0]);
-                printf("Usage: %s command inputfile [-t] [-s] [-f fix-format] [-e fix-file] \n", argv[0]);
+                printf("Usage: %s %s", argv[0], usage);
                 printf("Option: \n");
                 printf("    -t    Make traceable binary\n"); 
                 printf("    -s    Using safe mode\n"); 
                 printf("    -f    Fix arguments format\n");
                 printf("    -e    Fix arguments 0 by external file\n");
+                printf("    -b    Operating system bits\n");
                 printf("    -h    Display help and return\n");
                 return(0);
             case 't':
@@ -658,10 +661,14 @@ int main(int argc, char **argv)
                 file_flag++;
                 file_name = strdup(optarg);
                 break;
+            case 'b':
+                bit_flag++;
+                bit = strdup(optarg);
+                break;
             case '?':
                 return(1);
             default:
-                fprintf(stderr, "Usage: %s command inputfile [-t] [-s] [-f fix-format] [-e fix-file]\n", argv[0]);
+                fprintf(stderr, "Usage: %s %s", argv[0], usage);
                 return(1);   
         }
     }    
@@ -676,9 +683,10 @@ int main(int argc, char **argv)
         }        
     }
      
-    if (input_flag != 1 || command_flag != 1 || fix_flag > 1  
-        || trace_flag > 1 || safe_flag > 1 || file_flag > 1) {
-        fprintf(stderr, "Usage: %s command inputfile [-t] [-s] [-f fix-format] [-e fix-file]\n", argv[0]);
+    if (input_flag != 1 || command_flag != 1 || fix_flag > 1 || trace_flag > 1 
+        || safe_flag > 1 || file_flag > 1 || bit_flag>1
+        || bit_flag && strcmp(bit, "8") && strcmp(bit, "16") && strcmp(bit, "32") && strcmp(bit,"64")) {
+        fprintf(stderr, "Usage: %s %s\n", argv[0], usage);
         return(1);    
     }
 
@@ -859,8 +867,11 @@ int main(int argc, char **argv)
     
     /*Write to the data section*/         
     fprintf(out, "static const char *data[] = {\n");
-   
-    size = sizeof(long) * 8;
+    if (bit_flag) {
+        size = atoi(bit);
+    } else {
+        size = sizeof(long) * 8;
+    }
     text =(char *) malloc(size);
     j = 0;
     while (obscure_length) {

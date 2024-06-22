@@ -23,7 +23,7 @@ At present, the program has practical applications in ```AIX```, ```UNIX```, ```
 ### User manual
 - Generate C code command
  
-   ```shellc command inputfile [-t] [-s] [-f fix-format] [-e fix-file]```   
+   ```shellc command inputfile [-t] [-s] [-f fix-format] [-e fix-file] [-b 8|16|32|64]```   
 
     command：   Execute script commands, such ```sh```,```perl```,```python```,```node```,```ruby```,```Rscript```,```php```, etc.
 
@@ -36,6 +36,8 @@ At present, the program has practical applications in ```AIX```, ```UNIX```, ```
     -f option： Fix parameter 0 value or safe mode external parameter.
 
     -e option： Fix parameter 0 value by custom external file.
+
+    -b option： Operating system bits setting.
 
 - Code pattern differences
 
@@ -79,6 +81,10 @@ DragonFly 6.4|gdb|NO
 macOS 13|lldb|NO
 
 ### History
+
+- v1.2 2024-06-22
+
+  Add operating system bits setting
 
 - v1.1 2024-06-12
 
