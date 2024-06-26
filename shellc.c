@@ -3,11 +3,9 @@
  * GNU GENERAL PUBLIC LICENSE Version 3
  * Function: Convert script into C code
  * Author: ChenZhongChao
- * E-Mail: nbczc@163.com
  * Date: 2023-12-25
  * Version: 1.2
  * Github: https://github.com/chenzhch/shellc.git
- * Gitee: https://gitee.com/chenzhch/shellc.git
  */
 
 #include <stdio.h>
@@ -282,7 +280,7 @@ static const char *sh_start[] = {
     "        name = malloc((size_t) length);",
     "        memset(name, 0, length);",
     "        for (i = 0; i < length - 1; i++) {",     
-    "            switch(rand() % 3) {",
+    "            switch (rand() % 3) {",
     "                case 0:",
     "                    sprintf(name + i, \"%c\", rand() % 26 + 65);",
     "                    break;",
@@ -339,7 +337,7 @@ static const char *sh_end[] = {
     "        free(name);",
     "        fputc(' ', pipe);",
     "    }",
-    "    for(i = 1; i < argc; i++) {",
+    "    for (i = 1; i < argc; i++) {",
     "        fputs(\" \\\"\", pipe);",
     "        fwrite(argv[i], sizeof(char), strlen(argv[i]), pipe);",
     "        fputc('\"', pipe);",
@@ -348,7 +346,7 @@ static const char *sh_end[] = {
 };
 
 static const char *arg_start[] = {    
-    "    for(i = 1; i < argc; i++) {",
+    "    for (i = 1; i < argc; i++) {",
     "        length = strlen(argv[i]) + 128;",
     "        name = malloc(length);",
     "        memset(name, 0, length);",
@@ -363,7 +361,7 @@ static const char *arg_end[] = {
 };
 
 static const char *fifth_safe[] = {
-    "    if(pclose(pipe)) {",
+    "    if (pclose(pipe)) {",
     "        return(1);",
     "    }",
     "    return(0);",
@@ -503,7 +501,7 @@ long binary_to_int(char *str, int len)
 /*Generate function definition*/
 void function(int order, int x, int y, char *str)
 {
-    switch(order) {
+    switch (order) {
         case 1:  sprintf(str, "((~%d|~a)>(~%d|~b)?b-%d:a-%d)", x, y, x, y); break;
         case 2:  sprintf(str, "((~a|~%d)>(~b|~%d)?a<<%d:b<<%d)", x, y, x, y); break;
         case 3:  sprintf(str, "((a|b)>(%d|%d)?a|%d:b<<%d)", x, y, x, y); break;
@@ -614,13 +612,13 @@ int main(int argc, char **argv)
         if (argv[i][0] == '-') {
             if (strlen(argv[i]) > 1) {
                 for (k = 0; k < strlen(option); k++) {
-                    if(option[k] == argv[i][1]) break;
+                    if (option[k] == argv[i][1]) break;
                 }
                 args[j++] = strdup(argv[i]);
                 argv[i] = NULL; 
                 if (option[k + 1] == ':') {
                     i++;
-                    if(i == argc) break;
+                    if (i == argc) break;
                     args[j++] = strdup(argv[i]);
                     argv[i] = NULL;
                 }
@@ -631,7 +629,7 @@ int main(int argc, char **argv)
         }
     }
     for (i = 1; i < argc; i++) {
-        if(argv[i] != NULL) args[j++] = strdup(argv[i]);        
+        if (argv[i] != NULL) args[j++] = strdup(argv[i]);        
     }
   
     while ((opt = getopt(argc, args, option)) != -1) {
@@ -685,7 +683,7 @@ int main(int argc, char **argv)
      
     if (input_flag != 1 || command_flag != 1 || fix_flag > 1 || trace_flag > 1 
         || safe_flag > 1 || file_flag > 1 || bit_flag>1
-        || bit_flag && strcmp(bit, "8") && strcmp(bit, "16") && strcmp(bit, "32") && strcmp(bit,"64")) {
+        || (bit_flag && strcmp(bit, "8") && strcmp(bit, "16") && strcmp(bit, "32") && strcmp(bit,"64"))) {
         fprintf(stderr, "Usage: %s %s\n", argv[0], usage);
         return(1);    
     }
@@ -732,7 +730,7 @@ int main(int argc, char **argv)
     }
     
     /*Self file format*/
-    if(access(self_name, R_OK) == 0) {
+    if (access(self_name, R_OK) == 0) {
         self_file = fopen(self_name, "r");
         if (self_file == NULL) {
             fprintf(stderr, "Failed to open the file: %s\n", self_name);
@@ -934,7 +932,7 @@ int main(int argc, char **argv)
             k = 0;
             pos = i % 32;
             while (algorithm[pos][k]) {
-                switch(algorithm[pos][k]){   
+                switch (algorithm[pos][k]) {   
                     case '+': salt2 += (number[pos][k * 2][0] == 'a' ? offset1 : offset2) + atol(number[pos][k * 2 + 1]); break;
                     case '-': salt2 += (number[pos][k * 2][0] == 'a' ? offset1 : offset2) - atol(number[pos][k * 2 + 1]); break; 
                     case '*': salt2 += (number[pos][k * 2][0] == 'a' ? offset1 : offset2) * atol(number[pos][k * 2 + 1]); break;
@@ -1047,7 +1045,7 @@ int main(int argc, char **argv)
         fprintf(out, "    free(str);\n");  
     }
 
-    if(file_flag) {
+    if (file_flag) {
         fix_file = fopen(file_name, "r");              
         if (fix_file == NULL) {
             fprintf(stderr, "Failed to open the fix file: %s\n", file_name);
@@ -1076,7 +1074,7 @@ int main(int argc, char **argv)
                 }
             }
             fputc('"', out);
-            for(j = 0; j < k; j++) {
+            for (j = 0; j < k; j++) {
                 fprintf(out, ", argv[0]");
             }
             fprintf(out, ");\n");
@@ -1095,14 +1093,14 @@ int main(int argc, char **argv)
         i = 0;
         if (!fix_flag || !arg_code[fix_pos][0]) {
             fprintf(out, "    write_script(pipe);\n");
-            while(sh_end[i]) fprintf(out, "%s\n", sh_end[i++]); 
+            while (sh_end[i]) fprintf(out, "%s\n", sh_end[i++]); 
         }else {              
-            while(arg_start[i]) fprintf(out, "%s\n", arg_start[i++]); 
+            while (arg_start[i]) fprintf(out, "%s\n", arg_start[i++]); 
             i = 0;
-            while(arg_code[fix_pos][i]) fprintf(out, "        %s\n", arg_code[fix_pos][i++]); 
+            while (arg_code[fix_pos][i]) fprintf(out, "        %s\n", arg_code[fix_pos][i++]); 
             i = 0;
-            while(arg_end[i]) fprintf(out, "%s\n", arg_end[i++]); 
-            if(fix_format != NULL && !strcmp(fix_format, "PHP")) {
+            while (arg_end[i]) fprintf(out, "%s\n", arg_end[i++]); 
+            if (fix_format != NULL && !strcmp(fix_format, "PHP")) {
                 fprintf(out,  "    fwrite(\"//\", sizeof(char), 2, pipe);\n");    
             }
             fprintf(out, "    write_script(pipe);\n");             
@@ -1110,7 +1108,7 @@ int main(int argc, char **argv)
         i = 0;        
         while (fifth_safe[i]) fprintf(out, "%s\n", fifth_safe[i++]); 
     } else {     
-        if(fix_format != NULL && !strcmp(fix_format, "PHP")) {
+        if (fix_format != NULL && !strcmp(fix_format, "PHP")) {
             fprintf(out,  "    write(file[1], \"//\", 2);\n");    
         }   
         while (fifth[i]) fprintf(out, "%s\n", fifth[i++]);         
@@ -1128,14 +1126,14 @@ int main(int argc, char **argv)
     } else if (!strcmp(sysinfo.sysname, "AIX")) {
         while (ptrace_aix[i]) fprintf(out, "%s\n", ptrace_aix[i++]);        
     } else {
-        while(ptrace_unix[i]) fprintf(out, "%s\n", ptrace_unix[i++]); 
+        while (ptrace_unix[i]) fprintf(out, "%s\n", ptrace_unix[i++]); 
     }
     
     i = 0;
     if (safe_flag || trace_flag || self_flag) {
-        while(handler[i]) fprintf(out, "%s\n", handler[i++]);     
+        while (handler[i]) fprintf(out, "%s\n", handler[i++]);     
     } else {
-        while(handler_fork[i]) fprintf(out, "%s\n", handler_fork[i++]);     
+        while (handler_fork[i]) fprintf(out, "%s\n", handler_fork[i++]);     
     }
    
     fflush(out);
