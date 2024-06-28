@@ -23,7 +23,7 @@ At present, the program has practical applications in ```AIX```, ```UNIX```, ```
 ### User manual
 - Generate C code command
  
-   ```shellc command inputfile [-t] [-s] [-f fix-format] [-e fix-file] [-b 8|16|32|64]```   
+   ```shellc command inputfile [-t] [-s] [-f fix-format] [-e fix-file] [-p parameter] [-b 8|16|32|64]```   
 
     command：   Execute script commands, such ```sh```,```perl```,```python```,```node```,```ruby```,```Rscript```,```php```, etc.
 
@@ -36,6 +36,8 @@ At present, the program has practical applications in ```AIX```, ```UNIX```, ```
     -f option： Fix parameter 0 value or safe mode external parameter.
 
     -e option： Fix parameter 0 value by custom external file.
+
+    -p option： Command parameter, such as ```busybox shell``` using by ```shellc busybox example.sh -p sh```. 
 
     -b option： Operating system bits setting.
 
@@ -81,6 +83,10 @@ DragonFly 6.4|gdb|NO
 macOS 13|lldb|NO
 
 ### History
+
+- v1.3 2024-06-28
+
+  Add command parameter
 
 - v1.2 2024-06-22
 

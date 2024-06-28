@@ -4,7 +4,7 @@
  * Function: Convert script into C code
  * Author: ChenZhongChao
  * Date: 2023-12-25
- * Version: 1.2
+ * Version: 1.3
  * Github: https://github.com/chenzhch/shellc.git
  */
 
@@ -246,7 +246,11 @@ static const char *fourth[] = {
     "    }",
     "    free(str);",
     "    memset(dev, 0, sizeof(dev));",
-    "    sprintf(dev, \"/dev/fd/%d\", file[0]);",
+    "    sprintf(dev, \"/proc/self/fd/%d\", file[0]);",
+    "    if (access(dev, R_OK)) {",
+    "       sprintf(dev, \"/dev/fd/%d\", file[0]);",
+    "    }",
+    "    args = (char **) malloc((argc + 8) * sizeof(char *));",
     0
 };
 
@@ -262,13 +266,18 @@ static const char *fourth_safe[] = {
     "    name = malloc((size_t) length);",
     "    if (which(command, name)) {",   
     "        return(1);",
-    "    }",      
-    "    pipe = popen(name, \"w\");",
+    "    }",  
+    0
+};
+
+static const char *fourth_end[] = {
+    "    free(name);",
+    "    pipe = popen(str, \"w\");",
     "    if(pipe == NULL) {",
-    "        fprintf(stderr, \"Error: Command %s not found\\n\", command);",
+    "        perror(\"Failed to popen\");",
     "        return(1);",
     "    }",
-    "    free(name);",
+    "    free(str);",
     "",
     0
 };
@@ -298,15 +307,7 @@ static const char *sh_start[] = {
     0
 };
 
-static const char *fifth[] = {
-    "    args = (char **) malloc((argc + 8) * sizeof(char *));",
-    "    j = 0;",
-    "    if (!strcmp(command, \"node\")) {",
-    "        args[j++] = strdup(command);",  
-    "        args[j++] = strdup(\"--preserve-symlinks-main\");", 
-    "    } else {",
-    "        args[j++] = strdup(argv[0]);",
-    "    }",
+static const char *fifth[] = {    
     "    args[j++] = strdup(dev);",
     "    for (i = 1; i < argc; i++) {",
     "        args[j++] = strdup(argv[i]);",    
@@ -537,56 +538,13 @@ void function(int order, int x, int y, char *str)
     }
 }
 
-/*Which command*/
-int which(const char *command)
-{
-    char *name;
-    int i, j, len;
-    char *path = getenv("PATH");
-
-    if (command[0] == '/' || (command[0] == '.')) {
-        if (access(command, X_OK) == 0) {
-            return(0);
-        }
-        fprintf(stderr, "Error: Command %s not found\n", command);
-        return(1);
-    }
-
-    if (!path) {
-        fprintf(stderr, "PATH environment variable not set\n");
-        return(1);
-    }    
-    len = strlen(path) + strlen(command) + 8;
-    name = (char *) malloc(len); 
-    memset(name, 0,  (size_t) len); 
-    j = 0;
-    len = strlen(path);
-    for (i = 0; i <= len; i++) {
-        if(i == len || path[i] == ':') {
-            strcat(name, "/");
-            strcat(name, command);
-            if (access(name, X_OK) == 0) {
-                free(name);
-                return(0);
-            }
-            memset(name, 0,  (size_t) len); 
-            j = 0;   
-        } else {
-            name[j++] = path[i];
-        }
-    } 
-    free(name);
-    fprintf(stderr, "Error: Command %s not found\n", command);
-    return(1);
-}
-
 int main(int argc, char **argv)
 {
     FILE *in, *out, *fix_file, *self_file;
     int code_length, obscure_length, length, pos;
     int fix_pos = -1;
     char *code_text, *obscure_text, *text;
-    char *bitmap, *inname = NULL, *outname, *command = NULL;
+    char *bitmap, *inname = NULL, *outname, *command = NULL, *parameter = NULL;
     char *fix_format = NULL, *file_name = NULL, *bit = NULL;
     char str[1024];
     long result, offset1, offset2;
@@ -598,13 +556,14 @@ int main(int argc, char **argv)
     char algorithm[32][17];
     int i, j, k, loop, mode;
     int trace_flag = 0, fix_flag = 0, input_flag = 0, command_flag = 0, file_flag = 0;   
-    int self_flag = 0, safe_flag = 0, bit_flag = 0;    
+    int self_flag = 0, safe_flag = 0, bit_flag = 0, para_flag = 0;    
     struct utsname sysinfo;
     struct stat status; 
     char *self_name = "/proc/self/status";
-    char *option = "f:e:b:tsh";    
+    char *option = "f:e:b:p:tsh";    
     char **args = (char **) malloc((argc + 1) * sizeof(char *));
-    char *usage = "command inputfile [-t] [-s] [-f fix-format] [-e fix-file] [-b 8|16|32|64]";
+    char *token;
+    char *usage = "command inputfile [-t] [-s] [-f fix-format] [-e fix-file] [-p parameter] [-b 8|16|32|64]";
 
     j = 0;
     args[j++] = strdup(argv[0]);
@@ -636,13 +595,14 @@ int main(int argc, char **argv)
         switch (opt) {
             case 'h':
                 printf("%s: Convert script into C code\n", argv[0]);
-                printf("Usage: %s %s", argv[0], usage);
+                printf("Usage: %s %s\n", argv[0], usage);
                 printf("Option: \n");
                 printf("    -t    Make traceable binary\n"); 
                 printf("    -s    Using safe mode\n"); 
                 printf("    -f    Fix arguments format\n");
                 printf("    -e    Fix arguments 0 by external file\n");
                 printf("    -b    Operating system bits\n");
+                printf("    -p    Command parameter\n");
                 printf("    -h    Display help and return\n");
                 return(0);
             case 't':
@@ -663,6 +623,10 @@ int main(int argc, char **argv)
                 bit_flag++;
                 bit = strdup(optarg);
                 break;
+             case 'p':
+                para_flag++;
+                parameter = strdup(optarg);
+                break;
             case '?':
                 return(1);
             default:
@@ -682,17 +646,14 @@ int main(int argc, char **argv)
     }
      
     if (input_flag != 1 || command_flag != 1 || fix_flag > 1 || trace_flag > 1 
-        || safe_flag > 1 || file_flag > 1 || bit_flag>1
+        || safe_flag > 1 || file_flag > 1 || bit_flag > 1 || para_flag > 1
         || (bit_flag && strcmp(bit, "8") && strcmp(bit, "16") && strcmp(bit, "32") && strcmp(bit,"64"))) {
         fprintf(stderr, "Usage: %s %s\n", argv[0], usage);
         return(1);    
     }
 
     /*Running environment check*/
-    if (which(command)) {
-        return(1);
-    }  
-
+     
     if (uname(&sysinfo)) {
         perror("Failed to uname");
         return(1);
@@ -728,7 +689,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "Error: fix file %s is not exists\n", fix_format);
         return(1);          
     }
-    
+   
     /*Self file format*/
     if (access(self_name, R_OK) == 0) {
         self_file = fopen(self_name, "r");
@@ -983,11 +944,23 @@ int main(int argc, char **argv)
     i = 0;
     if (safe_flag) { 
         while (fourth_safe[i]) fprintf(out, "%s\n", fourth_safe[i++]);
+        if (para_flag) {
+            fprintf(out, "    length = strlen(name) + strlen(\"%s\") + 2;\n", parameter);
+            fprintf(out, "    str = malloc(length);\n");
+            fprintf(out, "    memset(str, 0, length);\n");
+            fprintf(out, "    strcat(str, name);\n");
+            fprintf(out, "    strcat(str, \" \");\n");
+            fprintf(out, "    strcat(str, \"%s\");\n", parameter);           
+        } else {
+            fprintf(out, "    str = strdup(name);\n"); 
+        }
+        i = 0;
+        while (fourth_end[i]) fprintf(out, "%s\n", fourth_end[i++]);
         i = 0;
         if (!fix_flag || !arg_code[fix_pos][0]) {
             while(sh_start[i]) fprintf(out, "%s\n", sh_start[i++]); 
         }        
-    } else {
+    } else {        
         while (fourth[i]) fprintf(out, "%s\n", fourth[i++]);               
     }
 
@@ -1110,7 +1083,18 @@ int main(int argc, char **argv)
     } else {     
         if (fix_format != NULL && !strcmp(fix_format, "PHP")) {
             fprintf(out,  "    write(file[1], \"//\", 2);\n");    
-        }   
+        }
+        fprintf(out, "%s\n", "    j = 0;");
+        if (para_flag) {
+            fprintf(out, "%s\n", "    args[j++] = strdup(command);"); 
+            fprintf(out, "    args[j++] = strdup(\"%s\");\n", parameter);     
+        } else if (!strcmp(command, "node")) {
+            fprintf(out, "%s\n", "    args[j++] = strdup(command);"); 
+            fprintf(out, "%s\n", "    args[j++] = strdup(\"--preserve-symlinks-main\");"); 
+        } else {
+            fprintf(out, "%s\n", "    args[j++] = strdup(argv[0]);");
+        }
+        i = 0 ;   
         while (fifth[i]) fprintf(out, "%s\n", fifth[i++]);         
     }
 
