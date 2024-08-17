@@ -84,6 +84,10 @@ macOS 13|lldb|NO
 
 ### History
 
+- v1.4 2024-08-17
+
+  Fix memory leak
+
 - v1.3 2024-06-28
 
   Add command parameter

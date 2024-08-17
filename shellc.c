@@ -4,7 +4,7 @@
  * Function: Convert script into C code
  * Author: ChenZhongChao
  * Date: 2023-12-25
- * Version: 1.3
+ * Version: 1.4
  * Github: https://github.com/chenzhch/shellc.git
  */
 
@@ -242,6 +242,7 @@ static const char *fourth[] = {
     "    str = strdup(\"Failed to pipe\");",
     "    if (pipe(file) == -1) {",
     "        perror(str);",
+    "        free(str);",
     "        return 1;",
     "    }",
     "    free(str);",
@@ -560,10 +561,12 @@ int main(int argc, char **argv)
     struct utsname sysinfo;
     struct stat status; 
     char *self_name = "/proc/self/status";
-    char *option = "f:e:b:p:tsh";    
+    char option[32];
     char **args = (char **) malloc((argc + 1) * sizeof(char *));
     char *token;
     char *usage = "command inputfile [-t] [-s] [-f fix-format] [-e fix-file] [-p parameter] [-b 8|16|32|64]";
+    memset(option, 0, sizeof(option));
+    strcat(option, "f:e:b:p:tsh");
 
     j = 0;
     args[j++] = strdup(argv[0]);
@@ -601,8 +604,8 @@ int main(int argc, char **argv)
                 printf("    -s    Using safe mode\n"); 
                 printf("    -f    Fix arguments format\n");
                 printf("    -e    Fix arguments 0 by external file\n");
-                printf("    -b    Operating system bits\n");
                 printf("    -p    Command parameter\n");
+                printf("    -b    Operating system bits\n");
                 printf("    -h    Display help and return\n");
                 return(0);
             case 't':
