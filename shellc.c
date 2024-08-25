@@ -4,7 +4,7 @@
  * Function: Convert script into C code
  * Author: ChenZhongChao
  * Date: 2023-12-25
- * Version: 1.4
+ * Version: 1.5
  * Github: https://github.com/chenzhch/shellc.git
  */
 
@@ -137,8 +137,8 @@ static const char *func_def[] = {
 static const char *first[] = {
     "{",
     "    int i, j, k;",
-    "    long mask;",
-    "    char chr[3], *str;",
+    "    long mask, salt1, salt2, salt;",
+    "    char chr[3], *str, *seed;",
     "    Fn fn[] = {",
     "        f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16,",
     "        f17, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27, f28, f29, f30, f31, f32,",
@@ -147,6 +147,11 @@ static const char *first[] = {
     "    };",
     "    srand(getpid());",
     "    i = 0;",
+    "    salt = strlen(command) + strlen(tracer);",
+    "    seed = (char *) malloc((size_t) (salt + 1));",
+    "    memset(seed, 0, salt + 1);",
+    "    strcat(seed, command);",
+    "    strcat(seed, tracer);",
     "    memset(chr, 0, (size_t) sizeof(chr));",
     "    while (data[i]) {",
     "        mask = (long) 1 << (atol(data[i + 1]) - 1);",
@@ -154,13 +159,16 @@ static const char *first[] = {
     "        str = (char *) malloc(k);",
     "        memset(str, 0, (size_t) k);",
     "        for (j = 0; j < atol(data[i + 1]); j++) {",        
-    "            memcpy(chr, &data[i + 5][j * 2], 2);",            
+    "            memcpy(chr, &data[i + 5][j * 2], 2);",   
+    "            salt1 = (atol(data[i + 2]) + ff(fn[atol(data[i]) -1], atol(data[i + 3]), atol(data[i + 4]))) % 256;",
+    "            salt2 = ff(fn[j % 32 + 32], atol(data[i + 3]), atol(data[i + 4])) % 256;",         
     "            sprintf(",
     "                str + strlen(str), \"%c\",",
     "                (atol(data[i + 2]) + ff(fn[atol(data[i]) -1], atol(data[i + 3]), atol(data[i + 4]))) & mask",
     "                ? (int) strtol(chr, 0, 16)",
-    "                ^ (int) (atol(data[i + 2]) + ff(fn[atol(data[i]) -1], atol(data[i + 3]), atol(data[i + 4]))) % 256",
-    "                ^ (int) ff(fn[j % 32 + 32], atol(data[i + 3]), atol(data[i + 4])) % 256",
+    "                ^ (int) salt1",
+    "                ^ (int) salt2",
+    "                ^ ((unsigned char) seed[(salt1 + salt2) % salt])",
     "                : 0",
     "            );",  
     "            if (strlen(str) == k - 1) {",
@@ -180,7 +188,8 @@ static const char *third[] = {
     "        }",
     "        free(str);",
     "        i += 6;",
-    "    }",
+    "    }",    
+    "    free(seed);",
     "    return(0);",
     "}",  
     "",
@@ -260,7 +269,7 @@ static const char *fourth_safe[] = {
     "{",
     "    FILE *pipe;",
     "    char *name, *str;",
-    "    int length, i;",
+    "    int length, i, status;",
     "    str = strdup(getenv(\"PATH\"));",
     "    length = strlen(str) + strlen(command) + 1;",
     "    free(str);",
@@ -363,8 +372,8 @@ static const char *arg_end[] = {
 };
 
 static const char *fifth_safe[] = {
-    "    if (pclose(pipe)) {",
-    "        return(1);",
+    "    if (status = pclose(pipe)) {",
+    "        return(WEXITSTATUS(status));",
     "    }",
     "    return(0);",
     "}",  
@@ -397,8 +406,8 @@ static const char *ptrace_self[] = {
     "        return(1);",
     "    }",
     "    while (fgets(str, sizeof(str), in)) {",
-    "        if (strstr(str, \"TracerPid:\") != NULL) {",
-    "            tracer_pid = atoi(strchr(str, ':') + 1);",
+    "        if (strstr(str, tracer) != NULL) {",
+    "            tracer_pid = atoi(strchr(str, tracer[strlen(tracer) -1]) + 1);",
     "            break;",
     "        }",
     "    }",
@@ -549,7 +558,7 @@ int main(int argc, char **argv)
     char *fix_format = NULL, *file_name = NULL, *bit = NULL;
     char str[1024];
     long result, offset1, offset2;
-    long salt1, salt2;
+    long salt1, salt2, salt;
     int size, digit, opt;   
     int route[32][17], x[32][16], y[32][16];
     char *operators = "+-*/%&|^";
@@ -563,8 +572,9 @@ int main(int argc, char **argv)
     char *self_name = "/proc/self/status";
     char option[32];
     char **args = (char **) malloc((argc + 1) * sizeof(char *));
-    char *token;
+    char *seed;
     char *usage = "command inputfile [-t] [-s] [-f fix-format] [-e fix-file] [-p parameter] [-b 8|16|32|64]";
+    char *tracer = "TracerPid:";
     memset(option, 0, sizeof(option));
     strcat(option, "f:e:b:p:tsh");
 
@@ -824,7 +834,8 @@ int main(int argc, char **argv)
         }
         fprintf(out, "    );\n}\n\n");
     }
-        
+
+    fprintf(out, "static const char *tracer = \"%s\";\n", tracer);     
     fprintf(out, "static const char *command = \"%s\";\n\n", command);   
     
     /*Write to the data section*/         
@@ -834,7 +845,12 @@ int main(int argc, char **argv)
     } else {
         size = sizeof(long) * 8;
     }
-    text =(char *) malloc(size);
+    text = (char *) malloc(size);
+    salt = strlen(command) + strlen(tracer);
+    seed = (char *) malloc(salt + 1);
+    memset(seed, 0, (size_t) (salt + 1));
+    strcat(seed, command);
+    strcat(seed, tracer);
     j = 0;
     while (obscure_length) {
         mode = rand() % 32;
@@ -909,7 +925,7 @@ int main(int argc, char **argv)
                 k++;
             }
             salt2 = labs(salt2) % 256;
-            fprintf(out, "%02X", ((unsigned char) text[i]) ^ ((int) salt1) ^ ((int) salt2));
+            fprintf(out, "%02X", ((unsigned char) text[i]) ^ ((int) salt1) ^ ((int) salt2) ^ ((unsigned char) seed[(salt1 + salt2) % salt]));
         }
         fprintf(out, "\",\n");
     }
@@ -1126,6 +1142,7 @@ int main(int argc, char **argv)
     fflush(out);
     fclose(out);
     printf("Ok! Make binary by \"cc %s -O2 -o %s.x\"\n", outname, inname);
+    free(seed);
     free(bitmap);
     free(code_text);
     free(obscure_text);
