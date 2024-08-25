@@ -25,7 +25,7 @@ At present, the program has practical applications in ```AIX```, ```UNIX```, ```
  
    ```shellc command inputfile [-t] [-s] [-f fix-format] [-e fix-file] [-p parameter] [-b 8|16|32|64]```   
 
-    command：   Execute script commands, such ```sh```,```perl```,```python```,```node```,```ruby```,```Rscript```,```php```, etc. To prevent obtaining the source code by modifying the interpreter, it is recommended to use the full path.
+    command：   Execute script commands, such ```sh```,```perl```,```python```,```node```,```ruby```,```Rscript```,```php```, etc. 
 
     inputfile： Script file name
 
@@ -87,9 +87,7 @@ macOS 13|lldb|NO
 - v1.5 2024-08-25
 
   Fix the incorrect exit status issue in safe mode
-
-  Optimize the encryption algorithm
-
+ 
 - v1.4 2024-08-17
 
   Fix memory leak
