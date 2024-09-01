@@ -14,16 +14,16 @@ For programs used in production environments, it is recommended to add the param
 
 I have tried the tools ```shc```, which can compile shell scripts into executable programs.  The main problems are:
 
-The ```shc``` command actually calls the ```sh -c``` command.  The source code can be seen through the ```ps -ef``` command. The length of the shell script cannot exceed ARG_MAX .
+The ```shc``` command actually calls the ```sh -c``` command.  The source code can be seen through the ```ps -ef``` command. The length of the shell script cannot exceed ARG_MAX. By forging interpreters or converting memory to storage files, the script source code can be obtained (currently, all script to C code conversion tools on GITHUB have this vulnerability).
 
 Shellc not only solves the problems that exist in ```shc```, ```shellc```  also adds code obfuscation, randomly generating effective character position calculation functions, random character encryption, and debugging to increase the complexity of disassembly and reverse engineering.If further difficulty is required, professional tools such as ```obfuscator-llvm``` can be used to further obfuscate the generated C code.
 
-Version 1.0 or above not only support shell, but also other scripting languages, which can completely replace  ```shc```.
+Version 1.0 or above not only support shell, but also other scripting languages, which can completely replace  ```shc```. Version 1.6 adds the function of obtaining script source code through anti-counterfeiting interpreter or memory to storage file conversion. The anti-counterfeiting interpreter needs to enable the - a or - i option.
 At present, the program has practical applications in ```AIX```, ```UNIX```, ```Linux``` environments. It is recommended to conduct comprehensive testing on the compiled program to prevent production failures.
 ### User manual
 - Generate C code command
  
-   ```shellc command inputfile [-t] [-s] [-f fix-format] [-e fix-file] [-p parameter] [-b 8|16|32|64]```   
+   ```shellc command inputfile [-t] [-s] [-a] [-f fix-format] [-e fix-file] [-p parameter] [-b 8|16|32|64] [-i interpreter]```   
 
     command：   Execute script commands, such ```sh```,```perl```,```python```,```node```,```ruby```,```Rscript```,```php```, etc. 
 
@@ -33,6 +33,8 @@ At present, the program has practical applications in ```AIX```, ```UNIX```, ```
 
     -s option： Generate C code mode, the -s option uses safe mode, and defaults to normal mode.
 
+    -a option:  Anti forgery interpreter requires the MD5 value of the interpreter in the runtime environment to be the same as that of the interpreter in the compilation environment.
+
     -f option： Fix parameter 0 value or safe mode external parameter.
 
     -e option： Fix parameter 0 value by custom external file.
@@ -41,11 +43,14 @@ At present, the program has practical applications in ```AIX```, ```UNIX```, ```
 
     -b option： Operating system bits setting.
 
+    -i option: Built in interpreter, ```interpreter``` is the file name corresponding to the runtime environment, such as ```/usr/bin/sh```, or a custom file name can be used, such as ```/tmp/myshell```. If there is no corresponding interpreter in the runtime environment, the interpreter file will be automatically generated at runtime. Built in interpreter with anti-counterfeiting function.
 - Code pattern differences
 
     The normal mode shell script has some code visibility issues in most Linux operating systems, and the code after the ```read``` command can be obtained through ```/proc/[pid]/fd/[pipe]```. The safe mode does not have this issue.
 
     The normal mode supports semaphore processing in scripts, while the safe mode does not support it.
+
+    The normal mode requires that the script length cannot exceed the pipeline buffer value, which is generally 64K for 64 bit systems. Safe mode does not have this issue.
 
     The normal mode supports human-machine interaction in all scripting languages, while some languages in safe mode do not support it, such as ```csh```,```tcsh```.
 
@@ -83,6 +88,14 @@ DragonFly 6.4|gdb|NO
 macOS 13|lldb|NO
 
 ### History
+
+- v1.6 2024-09-01
+
+  Add built-in interpreter 
+
+  Add anti-counterfeiting interpreter
+
+  Add anti memory to storage file 
 
 - v1.5 2024-08-25
 
