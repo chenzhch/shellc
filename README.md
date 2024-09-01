@@ -14,12 +14,12 @@ For programs used in production environments, it is recommended to add the param
 
 I have tried the tools ```shc```, which can compile shell scripts into executable programs.  The main problems are:
 
-The ```shc``` command actually calls the ```sh -c``` command.  The source code can be seen through the ```ps -ef``` command. The length of the shell script cannot exceed ARG_MAX. By forging interpreters or converting memory to storage files, the script source code can be obtained (currently, all script to C code conversion tools on GITHUB have this vulnerability).
+The ```shc``` command actually calls the ```sh -c``` command.  The source code can be seen through the ```ps -ef``` command. The length of the shell script cannot exceed ARG_MAX. Obtaining script source code through methods such as forging interpreters or memory dumps (currently, all tools for converting scripts to C code on GITHUB have this vulnerability).
 
 Shellc not only solves the problems that exist in ```shc```, ```shellc```  also adds code obfuscation, randomly generating effective character position calculation functions, random character encryption, and debugging to increase the complexity of disassembly and reverse engineering.If further difficulty is required, professional tools such as ```obfuscator-llvm``` can be used to further obfuscate the generated C code.
 
-Version 1.0 or above not only support shell, but also other scripting languages, which can completely replace  ```shc```. Version 1.6 adds the function of obtaining script source code through anti-counterfeiting interpreter or memory to storage file conversion. The anti-counterfeiting interpreter needs to enable the - a or - i option.
-At present, the program has practical applications in ```AIX```, ```UNIX```, ```Linux``` environments. It is recommended to conduct comprehensive testing on the compiled program to prevent production failures.
+Version 1.0 or above not only support shell, but also other scripting languages, which can completely replace  ```shc```. Version 1.6 adds the function of obtaining script source code through anti-counterfeiting interpreter or memory dump. The anti-counterfeiting interpreter needs to enable the -a or -i option.
+At present, the program has practical applications in ```AIX```, ```UNIX```, ```Linux``` environments. It is recommended to conduct comprehensive testing on the compiled program to prevent production failures. 
 ### User manual
 - Generate C code command
  
@@ -95,7 +95,7 @@ macOS 13|lldb|NO
 
   Add anti-counterfeiting interpreter
 
-  Add anti memory to storage file 
+  Add anti memory dump
 
 - v1.5 2024-08-25
 
