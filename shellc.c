@@ -4,7 +4,7 @@
  * Function: Convert script into C code
  * Author: ChenZhongChao
  * Date: 2023-12-25
- * Version: 1.6.1
+ * Version: 1.6.2
  * Github: https://github.com/chenzhch/shellc.git
  */
 
@@ -560,9 +560,9 @@ static const char *first[] = {
     "    memset(summary, 0, sizeof(summary));",
     "    srand(getpid());",
     "    i = 0;",
-    "    salt = strlen(command) + strlen(tracer) + strlen(digest);",
-    "    seed = (char *) malloc((size_t) (salt + 1));",
-    "    memset(seed, 0, salt + 1);",
+    "    salt = strlen(command) + strlen(tracer) + strlen(digest) + 2;",
+    "    seed = (char *) malloc((size_t) (salt + 16));",
+    "    memset(seed, 0, salt + 16);",
     "    strcat(seed, command);",
     "    strcat(seed, tracer);",
     "    if (inner || anti) {",
@@ -1420,14 +1420,14 @@ int main(int argc, char **argv)
     }
     text = (char *) malloc(size);
     if (inner_flag) {
-        salt = strlen(interpreter) + strlen(tracer) + strlen(digest);
-        seed = (char *) malloc(salt + 1);
-        memset(seed, 0, (size_t) (salt + 1));
+        salt = strlen(interpreter) + strlen(tracer) + strlen(digest) + 2;
+        seed = (char *) malloc(salt + 16);
+        memset(seed, 0, (size_t) (salt + 16));
         strcat(seed, interpreter);
     } else {
-        salt = strlen(command) + strlen(tracer) + strlen(digest);
-        seed = (char *) malloc(salt + 1);
-        memset(seed, 0, (size_t) (salt + 1));
+        salt = strlen(command) + strlen(tracer) + strlen(digest) + 2;
+        seed = (char *) malloc(salt + 16);
+        memset(seed, 0, (size_t) (salt + 16));
         strcat(seed, command);
     }
     strcat(seed, tracer);
