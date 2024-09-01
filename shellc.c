@@ -4,7 +4,7 @@
  * Function: Convert script into C code
  * Author: ChenZhongChao
  * Date: 2023-12-25
- * Version: 1.6
+ * Version: 1.6.1
  * Github: https://github.com/chenzhch/shellc.git
  */
 
@@ -1396,6 +1396,8 @@ int main(int argc, char **argv)
             }  
         }
         fprintf(out, "\n");        
+    } else {
+        fprintf(out, "    0x0\n");     
     }
     fprintf(out, "};\n");
 

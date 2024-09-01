@@ -89,6 +89,10 @@ macOS 13|lldb|NO
 
 ### History
 
+- v1.6.1 2024-09-01
+
+  Fix memory overflow
+
 - v1.6 2024-09-01
 
   Add built-in interpreter 
