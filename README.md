@@ -37,7 +37,7 @@ At present, the program has practical applications in ```AIX```, ```UNIX```, ```
 
     -f option： Fix parameter 0 value or safe mode external parameter.
 
-    -e option： Fix parameter 0 value by custom external file.
+    -e option： Fix parameter 0 value by custom external file, The definition of safe mode alias needs to be written in an external file.
 
     -p option： Command parameter, such as ```busybox shell``` using by ```shellc busybox example.sh -p sh```. 
 
@@ -45,8 +45,8 @@ At present, the program has practical applications in ```AIX```, ```UNIX```, ```
 
     -i option: Built in interpreter, ```interpreter``` is the file name corresponding to the runtime environment, such as ```/usr/bin/sh```, or a custom file name can be used, such as ```/tmp/myshell```. If there is no corresponding interpreter in the runtime environment, the interpreter file will be automatically generated at runtime. Built in interpreter with anti-counterfeiting function.
 - Code pattern differences
-
-    The normal mode shell script has some code visibility issues in most Linux operating systems, and the code after the ```read``` command can be obtained through ```/proc/[pid]/fd/[pipe]```. The safe mode does not have this issue.
+   
+    The normal mode shell script has code visibility issues, can be obtained through ```/proc/[pid]/fd/[pipe]```. The safe mode does not have this issue.
 
     The normal mode supports semaphore processing in scripts, while the safe mode does not support it.
 
@@ -54,7 +54,7 @@ At present, the program has practical applications in ```AIX```, ```UNIX```, ```
 
     The normal mode supports human-machine interaction in all scripting languages, while some languages in safe mode do not support it, such as ```csh```,```tcsh```.
 
-    The safe mode human-machine interaction needs to be modified to read from the device ```/dev/tty```. such as shell script ```read input``` needs to be changed to ```read input</dev/tty```, For other languages, refer to the ```test/test_input.*```. The normal mode does not require code modification.
+    Version 1.7 of the safe mode human-machine interaction SHELL does not require code modification, while versions 1.6 and below needs to be modified to read from the device ```/dev/tty```. such as shell script ```read input``` needs to be changed to ```read input</dev/tty```, For other languages, refer to the ```test/test_input.*```. The normal mode does not require code modification.
 
     The safe mode and normal mode support different script language types, which can be checked by running ```test/run.sh```.
 
@@ -88,6 +88,14 @@ DragonFly 6.4|gdb|NO
 macOS 13|lldb|NO
 
 ### History
+
+- v1.7 2024-09-18
+
+  Fix Issue # 18
+
+  Safe mode SHELL human-machine interaction support does not modify the source script program
+
+  Add support for safe mode aliases
 
 - v1.6.2 2024-09-01
 

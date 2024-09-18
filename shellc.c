@@ -4,7 +4,7 @@
  * Function: Convert script into C code
  * Author: ChenZhongChao
  * Date: 2023-12-25
- * Version: 1.6.2
+ * Version: 1.7
  * Github: https://github.com/chenzhch/shellc.git
  */
 
@@ -717,27 +717,25 @@ static const char *fourth_end[] = {
 };
 
 static const char *sh_start[] = {
-    "    if (argc > 1) {",
-    "        srand(getpid());",
-    "        length = rand() % 9 + 16;",
-    "        name = malloc((size_t) length);",
-    "        memset(name, 0, length);",
-    "        for (i = 0; i < length - 1; i++) {",     
-    "            switch (rand() % 3) {",
-    "                case 0:",
-    "                    sprintf(name + i, \"%c\", rand() % 26 + 65);",
-    "                    break;",
-    "                case 1:",    
-    "                    sprintf(name + i, \"%c\", rand() % 26 + 97);",
-    "                    break;", 
-    "                default:",
-    "                    sprintf(name + i, \"%c\", 95);",
-    "                    break;",           
-    "            }",
+    "    srand(getpid());",
+    "    length = rand() % 9 + 16;",
+    "    name = malloc((size_t) length);",
+    "    memset(name, 0, length);",
+    "    for (i = 0; i < length - 1; i++) {",     
+    "        switch (rand() % 3) {",
+    "            case 0:",
+    "                sprintf(name + i, \"%c\", rand() % 26 + 65);",
+    "                break;",
+    "            case 1:",    
+    "                sprintf(name + i, \"%c\", rand() % 26 + 97);",
+    "                break;", 
+    "            default:",
+    "                sprintf(name + i, \"%c\", 95);",
+    "                break;",           
     "        }",
-    "        fputs(name, pipe);",
-    "        fputs(\"() { \", pipe);",
-    "    }",  
+    "    }",
+    "    fputs(name, pipe);",
+    "    fputs(\"() { \", pipe);",
     0
 };
 
@@ -766,17 +764,16 @@ static const char *fifth[] = {
 };
 
 static const char *sh_end[] = {
-    "    if (argc > 1) {",
-    "        fputs(\" } ; \", pipe);",
-    "        fputs(name, pipe);",
-    "        free(name);",
-    "        fputc(' ', pipe);",
-    "    }",
+    "    fputs(\"\\n} ; \", pipe);",
+    "    fputs(name, pipe);",
+    "    free(name);",
+    "    fputc(' ', pipe);",
     "    for (i = 1; i < argc; i++) {",
     "        fputs(\" \\\"\", pipe);",
     "        fwrite(argv[i], sizeof(char), strlen(argv[i]), pipe);",
     "        fputc('\"', pipe);",
     "    }",
+    "    fputs(\" </dev/tty\", pipe);",
     0
 };
 
@@ -1554,8 +1551,8 @@ int main(int argc, char **argv)
     }
 
     i  = 0;
-    while (third[i]) fprintf(out, "%s\n", third[i++]);
-    
+    while (third[i]) fprintf(out, "%s\n", third[i++]); 
+
     i = 0;
     if (safe_flag) { 
         while (fourth_safe[i]) fprintf(out, "%s\n", fourth_safe[i++]);
@@ -1570,11 +1567,7 @@ int main(int argc, char **argv)
             fprintf(out, "    str = strdup(name);\n"); 
         }
         i = 0;
-        while (fourth_end[i]) fprintf(out, "%s\n", fourth_end[i++]);
-        i = 0;
-        if (!fix_flag || !arg_code[fix_pos][0]) {
-            while(sh_start[i]) fprintf(out, "%s\n", sh_start[i++]); 
-        }        
+        while (fourth_end[i]) fprintf(out, "%s\n", fourth_end[i++]);            
     } else {        
         while (fourth[i]) fprintf(out, "%s\n", fourth[i++]);               
     }
@@ -1677,10 +1670,12 @@ int main(int argc, char **argv)
     }
 
     i = 0;
-    if (safe_flag) {         
-        i = 0;
+    if (safe_flag) { 
         if (!fix_flag || !arg_code[fix_pos][0]) {
+            i = 0;
+            while(sh_start[i]) fprintf(out, "%s\n", sh_start[i++]); 
             fprintf(out, "    write_script(pipe);\n");
+            i = 0;
             while (sh_end[i]) fprintf(out, "%s\n", sh_end[i++]); 
         } else {              
             while (arg_start[i]) fprintf(out, "%s\n", arg_start[i++]); 
