@@ -3,8 +3,8 @@
  * GNU GENERAL PUBLIC LICENSE Version 3
  * Function: Convert script into C code
  * Author: ChenZhongChao
- * Date: 2023-12-25
- * Version: 1.7
+ * Birthdate: 2023-12-25
+ * Version: 1.8
  * Github: https://github.com/chenzhch/shellc.git
  */
 
@@ -12,9 +12,14 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include <limits.h>
 #include <sys/utsname.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
 
 typedef struct
 {
@@ -29,7 +34,7 @@ typedef struct
 #define HH(x, y, z) (((x) & (y)) | ((~(x)) & (z)))
 #define P0(x) ((x) ^ (LR((x), 9)) ^ (LR((x), 17)))
 #define P1(x) ((x) ^ (LR((x), 15)) ^ (LR((x), 23)))
-#define SWAP(x) (((x) >> 24) | (((x) & 0x00FF0000) >> 8) | (((x) & 0x0000FF00) << 8) | ((x) << 24))
+#define SWAP(x) ((((x) & 0xFF000000) >> 24) | (((x) & 0x00FF0000) >> 8) | (((x) & 0x0000FF00) << 8) | (((x) & 0x000000FF) << 24))
 
 unsigned int LR(unsigned int x, unsigned n) 
 {
@@ -300,10 +305,13 @@ static const char *head[] = {
     "#include <sys/wait.h>", 
     "#include <sys/stat.h>",
     "#include <sys/resource.h>",
+    "#include <fcntl.h>",
+    "#include <limits.h>",
+    "#include <time.h>",
     0
 };
 
-static const char *func_def[] = {
+static const char *first[] = {
     "typedef long(*Fn)(long, long);",
     "",
     "long ff(Fn fn, long a, long b)",
@@ -319,12 +327,16 @@ static const char *func_def[] = {
     "    unsigned int remain;",
     "} CTX;",
     "",
+    "#ifndef PATH_MAX",
+    "#define PATH_MAX 4096",
+    "#endif",
+    ""
     "#define FF(x, y, z) ((x) ^ (y) ^ (z))",
     "#define GG(x, y, z) (((x) & (y)) | ((x) & (z)) | ((y) & (z)))",
     "#define HH(x, y, z) (((x) & (y)) | ((~(x)) & (z)))",
     "#define P0(x) ((x) ^ (LR((x), 9)) ^ (LR((x), 17)))",
     "#define P1(x) ((x) ^ (LR((x), 15)) ^ (LR((x), 23)))",
-    "#define SWAP(x) (((x) >> 24) | (((x) & 0x00FF0000) >> 8) | (((x) & 0x0000FF00) << 8) | ((x) << 24))",
+    "#define SWAP(x) ((((x) & 0xFF000000) >> 24) | (((x) & 0x00FF0000) >> 8) | (((x) & 0x0000FF00) << 8) | (((x) & 0x000000FF) << 24))",
     "",
     "unsigned int LR(unsigned int x, unsigned n) ",
     "{",
@@ -467,6 +479,13 @@ static const char *func_def[] = {
     "    return(0);",
     "}",
     "",
+    "void xfree(void *buf)",
+    "{",
+    "    if (buf != NULL) {",
+    "        free(buf);", 
+    "        buf = NULL;",
+    "    }",   
+    "}",
     "int file_sign(unsigned char *name, unsigned char *sign)",
     "{",
     "    FILE *in;",
@@ -492,12 +511,11 @@ static const char *func_def[] = {
     "",
     "int which(const char *command, char *fullname)",
     "{",
-    "    char *name;",
+    "    char *name = NULL;",
     "    int i, j, len;",
     "    char *path = getenv(\"PATH\");",
     "    if (command[0] == '/' || (command[0] == '.')) {",
     "        if (access(command, X_OK) == 0) {",
-    "            memset(fullname, 0, (size_t) strlen(fullname));",
     "            strcpy(fullname, command);",
     "            return(0);",
     "        }",
@@ -518,9 +536,8 @@ static const char *func_def[] = {
     "            strcat(name, \"/\");",\
     "            strcat(name, command);",
     "            if (access(name, X_OK) == 0) {",
-    "                memset(fullname, 0, (size_t) strlen(fullname));",
     "                strcpy(fullname, name);",
-    "                free(name);",
+    "                xfree(name);",
     "                return(0);",
     "            }",
     "            memset(name, 0,  (size_t) len);", 
@@ -529,20 +546,17 @@ static const char *func_def[] = {
     "            name[j++] = path[i];",
     "        }",
     "    }", 
-    "    free(name);",
+    "    xfree(name);",
     "    fprintf(stderr, \"Error: command %s not found\\n\", command);",
     "    return(1);",
     "}",
     "",
-    0
-};
-
-static const char *first[] = {
+    "int write_script(int file)",
     "{",
-    "    int i, j, k;",
+    "    int i, j;",
     "    long mask, salt1, salt2, salt, length, script_length = 0;",
-    "    char chr[3], *str, *seed, summary[65];",
-    "    char *fullname;",
+    "    char chr[3], *seed = NULL, summary[65];",
+    "    char fullname[PATH_MAX];",
     "    FILE *script = NULL;",
     "    struct stat status;", 
     "    unsigned char byte = 0x0;",
@@ -558,24 +572,21 @@ static const char *first[] = {
     "        return(1);",
     "    }",
     "    memset(summary, 0, sizeof(summary));",
-    "    srand(getpid());",
+    "    memset(fullname, 0, sizeof(fullname));",
     "    i = 0;",
-    "    salt = strlen(command) + strlen(tracer) + strlen(digest) + 2;",
+    "    salt = strlen(command) + strlen(date_str) + strlen(message) + strlen(digest) + 2;",
     "    seed = (char *) malloc((size_t) (salt + 16));",
     "    memset(seed, 0, salt + 16);",
     "    strcat(seed, command);",
-    "    strcat(seed, tracer);",
+    "    strcat(seed, date_str);",
+    "    strcat(seed, message);",
     "    if (inner || anti) {",
-    "        length = strlen(getenv(\"PATH\")) + strlen(command) + 1;",
-    "        fullname = malloc((size_t) length);",
     "        if (which(command, fullname)) {",
-    "            free(seed);",
-    "            free(fullname);",
+    "            xfree(seed);",
     "            return(1);",
     "        }",
     "        if(file_sign((unsigned char *) fullname, (unsigned char *) summary)) {",
-    "            free(seed);",
-    "            free(fullname); ",
+    "            xfree(seed);",
     "            return(1);",
     "        }",
     "        stat(fullname, &status);", 
@@ -583,11 +594,9 @@ static const char *first[] = {
     "        script = fopen(fullname, \"rb\");",
     "        if (script == NULL) {",
     "             fprintf(stderr, \"Failed to open the file: %s\\n\", fullname);",
-    "             free(seed);",
-    "             free(fullname);",
+    "             xfree(seed);",
     "             return(1);",
     "        }",  
-    "        free(fullname);",   
     "    } else {",
     "        strcpy(summary, digest);",
     "    }",
@@ -595,11 +604,9 @@ static const char *first[] = {
     "    sprintf(seed + strlen(seed), \"%d%d\", inner, anti);",
     "    memset(chr, 0, (size_t) sizeof(chr));",
     "    while (data[i]) {",
-    "        mask = (long) 1 << (atol(data[i + 1]) - 1 + rl.rlim_cur);",
-    "        k = rand() % 8 + 2;",
-    "        str = (char *) malloc(k);",
-    "        memset(str, 0, (size_t) k);",
-    "        for (j = 0; j < atol(data[i + 1]); j++) {",        
+    "        mask = (long) 1 << (atol(data[i + 1]) - 1 + rl.rlim_cur);",    
+    "        for (j = 0; j < atol(data[i + 1]); j++) {",
+    "            byte = 0x0;",            
     "            memcpy(chr, &data[i + 5][j * 2], 2);",   
     "            salt1 = (atol(data[i + 2]) + ff(fn[atol(data[i]) -1], atol(data[i + 3]), atol(data[i + 4]))) % 256;",
     "            salt2 = ff(fn[j % 32 + 32], atol(data[i + 3]), atol(data[i + 4])) % 256;", 
@@ -608,297 +615,58 @@ static const char *first[] = {
     "                if (fseek(script, length, SEEK_SET) != 0) {",
     "                    perror(\"Failed to seeking interpreter file\");",
     "                    fclose(script);",
-    "                    free(seed);",
+    "                    xfree(seed);",
     "                    return(1);",
     "                }",                              
     "                if (fread(&byte, sizeof(byte), 1, script) != 1) {",
     "                    perror(\"Failed to reading interpreter file\");",
     "                    fclose(script);",
-    "                    free(seed);",    
+    "                    xfree(seed);",    
     "                    return(1);",
     "                }", 
-    "            }",        
-    "            sprintf(",
-    "                str + strlen(str), \"%c\",",
-    "                (atol(data[i + 2]) + ff(fn[atol(data[i]) -1], atol(data[i + 3]), atol(data[i + 4])) + rl.rlim_cur) & mask",
-    "                ? (int) strtol(chr, 0, 16)",
-    "                ^ (int) salt1",
-    "                ^ (int) salt2",
-    "                ^ ((unsigned char) seed[(salt1 + salt2) % salt])",
-    "                ^ byte",
-    "                : 0",
-    "            );",  
-    "            if (strlen(str) == k - 1) {",
-    0
-};
-
-static const char *sencod[] = {
-    "                    perror(\"Failed to write script\");",
-    "                    free(str);",
-    "                    free(seed);",
-    "                    return(1);",
-    "                }",
-    "                memset(str, 0, (size_t) k);",
-    "            }",            
-    "            mask >>= 1;",
-    "        }",
-    "        if (strlen(str) != 0) {",
-    0
-};
-
-static const char *third[] = {
-    "                perror(\"Failed to write script\");",
-    "                free(seed);",
-    "                free(str);",
-    "                return(1);",
     "            }",
-    "        }",
-    "        free(str);",
-    "        i += 6;",
-    "    }",    
-    "    free(seed);",
+    "            if ((atol(data[i + 2]) + ff(fn[atol(data[i]) -1], atol(data[i + 3]), atol(data[i + 4])) + rl.rlim_cur) & mask) {",
+    "                byte ^= (int) strtol(chr, 0, 16) ^ (int) salt1 ^ (int) salt2 ^ ((unsigned char) seed[(salt1 + salt2) % salt]);",
+    "                byte &= 0xFF;",
+    "                if(xbash || byte) {",
+    "                    if (write(file, &byte, 1) == -1) {",
+    "                        perror(\"Failed to write file\");",
+    "                        fclose(script);",
+    "                        xfree(seed);",    
+    "                        return(1);",
+    "                    }",
+    "                }",
+    "            }",
+    "            mask >>= 1;",
+    "       }",
+    "       i += 6;",
+    "    }",
+    "    xfree(seed);",
     "    if (inner || anti) fclose(script);",
     "    return(0);",
-    "}",  
-    "",    
-    0
-};
-
-static const char *fourth[] = {
+    "}",
+    "",
     "int handler(int argc, char **argv)",
     "{",
-    "    char dev[64], *str;",                                 
-    "    int file[2], i;",
+    "    char *dev = NULL, *name = NULL, *cwd = NULL, real[PATH_MAX], fullname[PATH_MAX];",
+    "    int file, i, length;",
     "    pid_t pid;",
     "    int j, status;",
-    "    char **args;",
-    "    str = strdup(\"Failed to pipe\");",
-    "    if (pipe(file) == -1) {",
-    "        perror(str);",
-    "        free(str);",
-    "        return 1;",
-    "    }",
-    "    free(str);",
-    "    memset(dev, 0, sizeof(dev));",
-    "    sprintf(dev, \"/proc/self/fd/%d\", file[0]);",
-    "    if (access(dev, R_OK)) {",
-    "       sprintf(dev, \"/dev/fd/%d\", file[0]);",
-    "    }",
-    "    args = (char **) malloc((argc + 8) * sizeof(char *));",
-    0
-};
-
-static const char *fourth_safe[] = {
-    "int handler(int argc, char **argv)",
-    "{",
-    "    FILE *pipe;",
-    "    char *name, *str;",
-    "    int length, i, status;",
-    "    str = strdup(getenv(\"PATH\"));",
-    "    length = strlen(str) + strlen(command) + 1;",
-    "    free(str);",
-    "    name = malloc((size_t) length);",
-    "    if (which(command, name)) {",   
-    "        return(1);",
-    "    }",  
-    0
-};
-
-static const char *fourth_end[] = {
-    "    free(name);",
-    "    pipe = popen(str, \"w\");",
-    "    if (pipe == NULL) {",
-    "        perror(\"Failed to popen\");",
-    "        return(1);",
-    "    }",
-    "    free(str);",
-    "",
-    0
-};
-
-static const char *sh_start[] = {
-    "    srand(getpid());",
-    "    length = rand() % 9 + 16;",
-    "    name = malloc((size_t) length);",
-    "    memset(name, 0, length);",
-    "    for (i = 0; i < length - 1; i++) {",     
-    "        switch (rand() % 3) {",
-    "            case 0:",
-    "                sprintf(name + i, \"%c\", rand() % 26 + 65);",
-    "                break;",
-    "            case 1:",    
-    "                sprintf(name + i, \"%c\", rand() % 26 + 97);",
-    "                break;", 
-    "            default:",
-    "                sprintf(name + i, \"%c\", 95);",
-    "                break;",           
-    "        }",
-    "    }",
-    "    fputs(name, pipe);",
-    "    fputs(\"() { \", pipe);",
-    0
-};
-
-static const char *fifth[] = {    
-    "    args[j++] = strdup(dev);",
-    "    for (i = 1; i < argc; i++) {",
-    "        args[j++] = strdup(argv[i]);",    
-    "    }",
-    "    args[j] = 0;",  
-    "    if ((pid = fork()) == 0) {",  
-    "       close(file[0]);",
-    "       write_script(file[1]);", 
-    "       return(0);",
-    "    } else if (pid < 0) {",
-    "        perror(\"Failed to fork\");",
-    "        return(1);",
-    "    }",
-    "    wait(&status);",
-    "    close(file[1]);",
-    "    execvp(command, args);",
-    "    perror(\"Failed to execvp\");",
-    "    return(1);",  
-    "}",
-    "",
-    0
-};
-
-static const char *sh_end[] = {
-    "    fputs(\"\\n} ; \", pipe);",
-    "    fputs(name, pipe);",
-    "    free(name);",
-    "    fputc(' ', pipe);",
-    "    for (i = 1; i < argc; i++) {",
-    "        fputs(\" \\\"\", pipe);",
-    "        fwrite(argv[i], sizeof(char), strlen(argv[i]), pipe);",
-    "        fputc('\"', pipe);",
-    "    }",
-    "    fputs(\" </dev/tty\", pipe);",
-    0
-};
-
-static const char *arg_start[] = {    
-    "    for (i = 1; i < argc; i++) {",
-    "        length = strlen(argv[i]) + 128;",
-    "        name = malloc(length);",
-    "        memset(name, 0, length);",
-    0
-};
- 
-static const char *arg_end[] = {
-    "        fwrite(name, sizeof(char), strlen(name), pipe);",
-    "        free(name);",
-    "    }",      
-    0
-};
-
-static const char *fifth_safe[] = {
-    "    if ((status = pclose(pipe))) {",
-    "        return(WEXITSTATUS(status));",
-    "    }",
-    "    return(0);",
-    "}",  
-    "",
-    0
-};
-
-static const char *main_func[] = {
-    "int main(int argc, char **argv)",
-    "{", 
-    0,
-};
-
-static const char *ptrace_self[] = {
-    "    char str[1024];",
-    "    char *name = \"/proc/self/status\";",
-    "    int tracer_pid = 0;",
-    0
-};
-
-static const char *ptrace_self_end[] = {
-    "    in = fopen(name, \"r\");",
-    "    if (in == NULL) {",
-    "        fprintf(stderr, \"Failed to open the file: %s\\n\", name);",
-    "        return(1);",
-    "    }",
-    "    while (fgets(str, sizeof(str), in)) {",
-    "        if (strstr(str, tracer) != NULL) {",
-    "            tracer_pid = atoi(strchr(str, tracer[strlen(tracer) -1]) + 1);",
-    "            break;",
-    "        }",
-    "    }",
-    "    fclose(in);",
-    "    if (tracer_pid) {",
-    "        return(1);",
-    "    }",
-    0
-};
-
-static const char *handler[] = {
-    "    return(handler(argc, argv));",
-    "}",
-    0 
-};
-
-static const char *ptrace_aix[] = {
-    "    pid_t pid = 0;",
-    "    int status;",
-    0
-};
-
-
-static const char *ptrace_aix_end[] = {   
-    "    if ((pid = fork()) == 0) {",
-    "        if (__linux_ptrace(PT_WRITE_GPR, getppid(), 0, 0)) {",
-    "            kill(getppid(), SIGKILL);",
-    "        } else {",
-    "            __linux_ptrace(PT_WRITE_FPR, getppid(), 0, 0);",
-    "        }",
-    "        return(0);",
-    "    } else if (pid < 0) {",
-    "        perror(\"Failed to fork\");",
-    "        return(1);",
-    "    }",
-    "    wait(0);",
-    0
-};
-
-static const char *handler_fork[] = {
-    "    if ((pid = fork()) == 0) {", 
-    "        return(handler(argc, argv));",
-    "    } else if (pid < 0) {",
-    "        perror(\"Failed to fork\");",
-    "        return(1);",
-    "    }",
-    "    wait(&status);",
-    "    if (status) {",
-    "        return(1);",
-    "    } else {",
-    "        return(0);",
-    "    }",
-    "}",
-    0
-};
-
-static const char *ptrace_unix[] = {
-    "    pid_t pid = 0;",    
-    "    int status;",
-    0
-};
-
-static const char *ptrace_unix_end[] = {
-    "    if (ptrace(0, 0, 0, 0)) {",
-    "        return(1);",        
-    "    }",
-    0 
-};
-
-static const char *traced[] = {
-    "    int length;",
-    "    unsigned char *fullname;",
+    "    char **args = NULL;",
     "    unsigned char summary[65];",
     "    FILE *in = NULL;",
+    "    struct tm *timeinfo;",
     "    struct rlimit rl;",
+    "    time_t rawtime;", 
+    "    char nowdate[9];",
+    "    time(&rawtime);",
+    "    timeinfo = localtime(&rawtime);",
+    "    memset(nowdate, 0, sizeof(nowdate));",
+    "    strftime(nowdate, sizeof(nowdate), \"%Y%m%d\", timeinfo);", 
+    "    if (strcmp(nowdate, date_str) > 0) {",
+    "        printf(\"%s\\n\", message);",
+    "        return(1);",
+    "    }",
     "    if (getrlimit(RLIMIT_CORE, &rl) == -1) {",
     "        perror(\"Failed to getrlimit\");",
     "        return(1);",
@@ -929,37 +697,194 @@ static const char *traced[] = {
     "            }",
     "        }",
     "    }",
-    "    length = strlen(getenv(\"PATH\")) + strlen(command) + 1;",
-    "    fullname = malloc((size_t) length);",
-    "    if (which(command, (char *) fullname)) {",
-    "        free(fullname);",
+    "    if (which(command, fullname)) {",
     "        return(1);",
     "    }",       
     "    if (inner || anti) {",
     "        memset(summary, 0, sizeof(summary));",
     "        if (file_sign((unsigned char *) fullname, (unsigned char *) summary)) {",
-    "            free(fullname);",
     "            return(1);",
     "        }",
     "        if (strcmp((char *) summary, (char *) digest)) {",
     "            fprintf(stderr, \"Error: invalid interpreter %s\\n\", fullname);",
-    "            free(fullname);",
     "            return(1);",
     "        }",
     "    }",    
-    "    free(fullname);",
+    "    srand(time(0));",
+    "    length = rand() % 8 + 16;",
+    "    name = malloc((size_t) length);",
+    "    memset(name, 0, length);",
+    "    for (i = 0; i < length - 8; i++) {",
+    "        switch (rand() % 2) {",
+    "            case 0:",
+    "                sprintf(name + i, \"%c\", rand() % 26 + 65);",
+    "                break;",
+    "            case 1:",
+    "                sprintf(name + i, \"%c\", rand() % 26 + 97);",
+    "                break;",
+    "        }",
+    "    } ",
+    "    sprintf(name + i, \"%d\", rand()%100);",
+    "    if (xbash) strcat(name, \"X\");",
+    "    if (access(\"/tmp\", R_OK)) {",
+    "        if(realpath(argv[0], real) == NULL) {",
+    "            printf(\"Failed to realpath\\n\");",
+    "            return(1);",
+    "	     }",
+    "        length = strlen(real);",
+    "        dev = (char *) malloc((size_t) (length + 64));",
+    "        cwd = (char *) malloc((size_t) (length));",
+    "        memset(dev, 0, length + 64);",
+    "        memset(cwd, 0, length);",
+    "        memcpy(cwd, real, strlen(real) - strlen(strrchr(real, '/')));",
+    "        sprintf(dev, \"%s/%s\", cwd, name);",
+    "        xfree(cwd);",
+    "    } else {",
+    "        dev = (char *) malloc((size_t) 64);",
+    "        memset(dev, 0, 64);",
+    "        sprintf(dev, \"/tmp/%s\", name);",
+    "    }",
+    "    xfree(name);",
+    "    if(mkfifo(dev, S_IRUSR | S_IWUSR)) {",
+    "        perror(\"Failed to mkfifo\");",
+    "        return(1);    ",
+    "    }",
+    "    if ((pid = fork()) == 0) { ",
+    "        file = open(dev, O_WRONLY);",
+    "        if(unlink(dev))  {",
+    "            perror(\"Failed to unlink\");",
+    "            return(1);    ",
+    "        }",
     0
 };
+
+static const char *second[] = {
+    "        close(file);",
+    "        _exit(0);",
+    "    } else if (pid < 0) {",
+    "        perror(\"Failed to fork\");",
+    "        return(1);",
+    "    }",
+    "    args = (char **) malloc((argc + 8) * sizeof(char *));",
+    "    j = 0;",
+    0
+};
+
+static const char *third[] = {    
+    "    args[j++] = strdup(dev);",
+    "    xfree(dev);",
+    "    for (i = 1; i < argc; i++) {",
+    "        args[j++] = strdup(argv[i]);",
+    "    }",
+    "    args[j] = 0;",
+    "    execvp(command, args);",
+    "    perror(\"Failed to execvp\");",
+    "    wait(&status);",
+    "    return(1);",
+    "}",
+    "",
+    "typedef struct {",
+    "    int argc;",
+    "    char **argv;",
+    "} Param;",
+    "",
+    "int process(void *arg)", 
+    "{",
+    "    Param *param = (Param *) arg;",
+    "    return(handler(param->argc, param->argv));",
+    "}",
+    "",
+    0
+};
+
+
+static const char *ptrace_sco[] = {
+    "int main(int argc, char **argv)",
+    "{",
+    "    pid_t pid = 0;",
+    "    int status;",
+    "    if(ptrace(0, 0, 0, 0)) {",
+    "        return(1);",        
+    "    }",
+    "    if ((pid = fork()) == 0) {", 
+    "        return(handler(argc, argv));",
+    "    } else if (pid < 0) {",
+    "        perror(\"Failed to fork\");",
+    "        return(1);",
+    "    }",
+    "    waitpid(pid, &status, 0);",
+    "    return(WEXITSTATUS(status));", 
+    "}",
+    0
+};
+
+static const char *ptrace_aix[] = {
+    "int main(int argc, char **argv)",
+    "{",
+    "    pid_t pid = 0;",
+    "    if ((pid = fork()) == 0) {",
+    "        if (__linux_ptrace(PT_WRITE_GPR, getppid(), 0, 0)) {",
+    "            kill(getppid(), SIGKILL);",
+    "        } else {",
+    "            __linux_ptrace(PT_WRITE_FPR, getppid(), 0, 0);",
+    "        }",
+    "        return(0);",
+    "    } else if (pid < 0) {",
+    "        perror(\"Failed to fork\");",
+    "        return(1);",
+    "    }",
+    "    wait(0);",
+    "    return(handler(argc, argv));",
+    "}",
+    0
+};
+
+static const char *ptrace_linux[] = {
+    "int main(int argc, char **argv)",
+    "{",
+    "    Param param = {argc, argv};",
+    "    pthread_t id = 0;",
+    "    void *result;",
+    "    if(ptrace(0, 0, 0, 0)) {",
+    "        return(1);",        
+    "    }",
+    "    if(pthread_create(&id, 0, (void *) process, &param)) {",
+    "        perror(\"Faild to pthread_create\");",
+    "        return(1);",
+    "    }",
+    "    if(pthread_join(id, &result)) {",
+    "        perror(\"Faild to pthread_join\");",
+    "        return(1);",
+    "    }",
+    "    return((long) result);",
+    "}",
+    0 
+};
+
+static const char *traced[] = {
+    "int main(int argc, char **argv)",
+    "{",
+    "    return(handler(argc, argv));",
+    "}",
+    0 
+};
+
+void xfree(void *buf)
+{
+    if (buf != NULL) {
+        free(buf); 
+        buf = NULL;
+    }   
+}
 
 /*Which command*/
 int which(const char *command, char *fullname)
 {
-    char *name;
+    char *name = NULL;
     int i, j, len;
     char *path = getenv("PATH");
     if (command[0] == '/' || (command[0] == '.')) {
         if (access(command, X_OK) == 0) {
-            memset(fullname, 0, (size_t) strlen(fullname));
             strcpy(fullname, command);
             return(0);
         }
@@ -980,8 +905,8 @@ int which(const char *command, char *fullname)
             strcat(name, "/");
             strcat(name, command);
             if (access(name, X_OK) == 0) {
-                memset(fullname, 0, (size_t) strlen(fullname));
-                strcpy(fullname, name);                free(name);
+                strcpy(fullname, name);                
+                xfree(name);
                 return(0);
             }
             memset(name, 0,  (size_t) len);
@@ -990,7 +915,7 @@ int which(const char *command, char *fullname)
             name[j++] = path[i];
         }
     }
-    free(name);
+    xfree(name);
     fprintf(stderr, "Error: Command %s not found\n", command);
     return(1);
 }
@@ -1047,14 +972,25 @@ void function(int order, int x, int y, char *str)
     }
 }
 
+void free_args(char **args, int len)
+{
+    int i;
+    if(len == 0) return;
+    for(i = 0; i < len; i++) {
+        xfree(args[i]);
+    }
+    xfree(args);
+}
+
 int main(int argc, char **argv)
 {
-    FILE *in, *out, *fix_file, *self_file, *script = NULL;
+    FILE *in, *out, *fix_file, *script = NULL;
     int code_length, obscure_length, length = 0, pos;
     int fix_pos = -1;
-    char *code_text, *obscure_text, *text;
-    char *bitmap, *inname = NULL, *outname, *command = NULL, *parameter = NULL;
-    char *fix_format = NULL, *file_name = NULL, *bit = NULL, *fullname = NULL;
+    char *code_text = NULL, *obscure_text = NULL, *text = NULL;
+    char *bitmap = NULL, *inname = NULL, *outname = NULL, *command = NULL, *parameter = NULL;
+    char *fix_format = NULL, *file_name = NULL, *bit = NULL, fullname[PATH_MAX];
+    char *date_str = NULL, *message = NULL;
     char str[1024];
     long result, offset1, offset2, script_length = 0L;
     long salt1, salt2, salt;
@@ -1065,22 +1001,31 @@ int main(int argc, char **argv)
     char algorithm[32][17];
     unsigned char byte = 0x0;
     int i, j, k, loop, mode;
-    int trace_flag = 0, fix_flag = 0, input_flag = 0, command_flag = 0, file_flag = 0;   
-    int self_flag = 0, safe_flag = 0, bit_flag = 0, para_flag = 0, anti_flag = 0, inner_flag = 0;    
+    int trace_flag = 0, fix_flag = 0, input_flag = 0, command_flag = 0, file_flag = 0, xbash_flag = 0;   
+    int bit_flag = 0, date_flag = 0, message_flag = 0, para_flag = 0, anti_flag = 0, inner_flag = 0;   
     struct utsname sysinfo;
     struct stat status; 
-    char *self_name = "/proc/self/status";
     char option[32];
-    char **args = (char **) malloc((argc + 1) * sizeof(char *));
-    char *seed;
-    char *usage = "command inputfile [-t] [-s] [-a] [-f fix-format] [-e fix-file] [-p parameter] [-b 8|16|32|64] [-i interpreter]";
-    char *tracer = "TracerPid:";
+    char *seed = NULL;
+    char **args = NULL;
+    char *usage = "command inputfile [-t] [-a] [-x] [-f fix-format] [-e fix-file] [-p parameter] [-i interpreter] [-b 8|16|32|64] [-d YYYYMMDD] [-m message]";
     char *interpreter = NULL;
+    
     memset(option, 0, sizeof(option));
-    strcat(option, "f:e:b:p:i:tsah");
+    memset(fullname, 0, sizeof(fullname));
+    strcat(option, "f:e:p:i:b:d:m:taxh");
     memset(digest, 0, sizeof(digest));
-    sprintf(digest, "%064d", 0);
-
+    sprintf(digest, "%064d", 0);     
+    
+    if(argc > strlen(option)) {
+        fprintf(stderr, "Usage: %s %s\n", argv[0], usage);
+        return(1);        
+    }
+    args = (char **) malloc((argc) * sizeof(char *));
+    if(args == NULL) {
+        fprintf(stderr, "malloc error\n");
+        return(1); 
+    }
     j = 0;
     args[j++] = strdup(argv[0]);
     for (i = 1; i < argc; i++) {
@@ -1115,21 +1060,23 @@ int main(int argc, char **argv)
                 printf("Usage: %s %s\n", argv[0], usage);
                 printf("Option: \n");
                 printf("    -t    Make traceable binary\n"); 
-                printf("    -s    Using safe mode\n"); 
+                printf("    -x    Script compiled by xbash\n");
                 printf("    -f    Fix arguments format\n");
                 printf("    -e    Fix arguments 0 by external file\n");
                 printf("    -p    Command parameter\n");
-                printf("    -b    Operating system bits\n");
                 printf("    -a    Anti modification interpreter\n");
+                printf("    -b    Operating system bits\n");
                 printf("    -i    Built in script interpreter\n");
+                printf("    -d    Expiration date in YYYYMMDD format\n");
+                printf("    -m    Expiration date message, default 'The program has expired'\n");
                 printf("    -h    Display help and return\n");
-                return(0);
+                goto finish;
             case 't':
                 trace_flag++;
                 break;
-            case 's':
-                safe_flag++;
-                break;    
+            case 'x':
+                xbash_flag++;
+                break;
             case 'f':
                 fix_flag++;
                 fix_format = strdup(optarg);
@@ -1153,11 +1100,19 @@ int main(int argc, char **argv)
             case 'a':
                 anti_flag++;
                 break;
+            case 'd':
+                date_flag++;
+                date_str = strdup(optarg);
+                break;
+            case 'm':
+                message_flag++;
+                message = strdup(optarg);
+                break;
             case '?':
-                return(1);
+                goto finish;
             default:
                 fprintf(stderr, "Usage: %s %s", argv[0], usage);
-                return(1);   
+                goto finish;   
         }
     }    
 
@@ -1165,30 +1120,47 @@ int main(int argc, char **argv)
         if (!command_flag) {            
             command = strdup(args[i]);            
             command_flag = 1;    
-        } else {           
-            inname = strdup(args[i]);
+        } else {
+            if(!input_flag) inname = strdup(args[i]);
             input_flag++; 
         }        
     }      
-
     if (input_flag != 1 || command_flag != 1 || fix_flag > 1 || trace_flag > 1 
-        || safe_flag > 1 || file_flag > 1 || bit_flag > 1 || para_flag > 1
-        || anti_flag > 1 || inner_flag > 1 
+        || file_flag > 1 || bit_flag > 1 || para_flag > 1 || anti_flag > 1 
+        || inner_flag > 1 || date_flag > 1 || message_flag > 1 || xbash_flag > 1 
         || (bit_flag && strcmp(bit, "8") && strcmp(bit, "16") && strcmp(bit, "32") && strcmp(bit,"64"))) {
         fprintf(stderr, "Usage: %s %s\n", argv[0], usage);
-        return(1);    
+        goto finish;    
     } 
     
-    if (inner_flag && anti_flag) {
-        fprintf(stderr, "Usage: %s %s\n", argv[0], "Error: Only one of the options -a or -i can be selected");
-        return(1); 
+    if(date_flag) {
+        if (strlen(date_str) != 8) {
+            fprintf(stderr, "Error: invalid date format\n");
+            goto finish;
+        }
+        for (i = 0; i < strlen(date_str); i++) {
+            if (date_str[i] < '0' || date_str[i] > '9') {
+                fprintf(stderr, "Error: invalid date format\n");
+                goto finish;   
+            }
+        }
     }
-
+    
+    if (message_flag && !date_flag) {
+        fprintf(stderr, "Error: option -m must have -d\n");
+        goto finish;      
+    }
+    
+    if (inner_flag && anti_flag) {
+        fprintf(stderr, "Error: only one of the options -a or -i can be selected\n");
+        goto finish; 
+    }
+    
     /*Running environment check*/
      
     if (uname(&sysinfo)) {
         perror("Failed to uname");
-        return(1);
+        goto finish;
     }
 
     i = 0;
@@ -1196,9 +1168,9 @@ int main(int argc, char **argv)
         while (sysname[i]) {
             if (!strcmp(sysinfo.sysname, sysname[i])) {
                 fprintf(stderr, "Error: OS not support untraceable\n");
-                return(1);
+                goto finish;
             }
-              i++;
+            i++;
         }     
     }
     
@@ -1213,58 +1185,47 @@ int main(int argc, char **argv)
         } 
         if (fix_pos == -1) {
             fprintf(stderr, "Error: invalid fix format %s\n", fix_format);
-            return(1);     
+            goto finish;     
         }
     }  
 
     if (file_flag && access(file_name, R_OK)) {       
-        fprintf(stderr, "Error: fix file %s is not exists\n", fix_format);
-        return(1);          
+        fprintf(stderr, "Error: fix file %s is not exists\n", fix_format); 
+        goto finish;          
     }
 
     length = strlen(getenv("PATH")) + strlen(command) + 1;
-    fullname = malloc((size_t) length);
     if (inner_flag || anti_flag) {
         if(which(command, fullname)) {
-            free(fullname);
-            return(1); 
+            goto finish; 
         } else if (file_sign((unsigned char *) fullname, (unsigned char *) digest)) {
-            free(fullname);
-            return(1); 
+            goto finish; 
         }
-    }
-
-    /*Self file format*/
-    if (access(self_name, R_OK) == 0) {
-        self_file = fopen(self_name, "r");
-        if (self_file == NULL) {
-            fprintf(stderr, "Failed to open the file: %s\n", self_name);
-            return(1);
-        }
-        while (fgets(str, sizeof(str), self_file)) {
-            if (strstr(str, "TracerPid:") != NULL) {
-                self_flag = 1;
-                break;
-            }
-        }
-        fclose(self_file);
     }
         
     in = fopen(inname, "r");
-    if (in == NULL) {
+    if (in == NULL) { 
         fprintf(stderr, "Failed to open the file: %s\n", inname);
-        return(1);
+        goto finish;;
     }
     stat(inname, &status);
     code_length = status.st_size + 32;
 
     code_text = (char *) malloc(code_length);
     memset(code_text, 0, (size_t) code_length);
-    
     i = 0;
     for (j = 0; j < status.st_size; j++) {
         code_text[i++] = fgetc(in);
     }  
+    
+    if (xbash_flag 
+        && (status.st_size < 8 || (code_text[0] & 0xFF) != 0xEF || (code_text[1] & 0xFF) != 0x97 
+            || (code_text[2] & 0xFF) != 0xFB || (code_text[3] & 0xFF) != 0x03 || (code_text[4] & 0xFF) != 0xC7 
+            || (code_text[5] & 0xFF) != 0x65 || (code_text[6] & 0xFF) != 0xA8 || (code_text[7] & 0xFF) != 0x03)) {
+        fclose(in);    
+        fprintf(stderr, "Error: %s is not in xbash format\n", inname);
+        goto finish;
+    }
         
     srand(time(0));
     obscure_length = code_length / 5 * 6  + rand() % 1024; 
@@ -1327,16 +1288,17 @@ int main(int argc, char **argv)
     out = fopen(outname, "w");
     if (out == NULL) {
         fprintf(stderr, "Failed to write to file %s\n", outname);
-        return(1);
+        goto finish;
     }
     
     /*Write to the file header*/
     i = 0;
     while (head[i]) fprintf(out, "%s\n", head[i++]); 
     
-    if(strcmp(sysinfo.sysname, "SCO_SV")) {
+    if (!trace_flag && strcmp(sysinfo.sysname, "SCO_SV")) {
+        fprintf(out, "#include <pthread.h>\n");
         fprintf(out, "#include <sys/ptrace.h>\n");
-    }       
+    }      
      
     /*Calculation path function*/
     for (i = 0; i < 32; i++) {
@@ -1372,7 +1334,7 @@ int main(int argc, char **argv)
         script = fopen(fullname, "rb");
         if (script == NULL) {
             fprintf(stderr, "Failed to open the file: %s\n", fullname);
-            return(1);
+            goto finish;
         }   
     }
 
@@ -1403,31 +1365,44 @@ int main(int argc, char **argv)
     } else {
         fprintf(out, "static const char *command = \"%s\";\n", command);     
     }
-    fprintf(out, "static const char *tracer = \"%s\";\n", tracer);    
+    fprintf(out, "static const short xbash = %d;\n", xbash_flag);    
     fprintf(out, "static const char *digest = \"%s\";\n", digest); 
     fprintf(out, "static const short inner = %d;\n", inner_flag); 
-    fprintf(out, "static const short anti = %d;\n", anti_flag); 
+    fprintf(out, "static const short anti = %d;\n", anti_flag);
+    if (date_flag) {
+        fprintf(out, "static const char *date_str = \"%s\";\n", date_str);    
+    } else {
+        date_str = strdup("99991231");
+        fprintf(out, "static const char *date_str = \"%s\";\n", "99991231");     
+    }
+    if (message_flag) {
+        fprintf(out, "static const char *message = \"%s\";\n", message);    
+    } else {
+        message = strdup("The program has expired");
+        fprintf(out, "static const char *message = \"%s\";\n", "The program has expired");     
+    }
 
     /*Write to the data section*/         
     fprintf(out, "static const char *data[] = {\n");
     if (bit_flag) {
         size = atoi(bit);
     } else {
-        size = sizeof(long) * 8;
+        size = 32;
     }
     text = (char *) malloc(size);
     if (inner_flag) {
-        salt = strlen(interpreter) + strlen(tracer) + strlen(digest) + 2;
+        salt = strlen(interpreter) + strlen(date_str) + strlen(message) + strlen(digest) + 2;
         seed = (char *) malloc(salt + 16);
         memset(seed, 0, (size_t) (salt + 16));
         strcat(seed, interpreter);
     } else {
-        salt = strlen(command) + strlen(tracer) + strlen(digest) + 2;
+        salt = strlen(command) + strlen(date_str) + strlen(message) + strlen(digest) + 2;
         seed = (char *) malloc(salt + 16);
         memset(seed, 0, (size_t) (salt + 16));
         strcat(seed, command);
     }
-    strcat(seed, tracer);
+    strcat(seed, date_str);
+    strcat(seed, message);
     strcat(seed, digest);
     sprintf(seed + strlen(seed), "%d%d", inner_flag, anti_flag);
     j = 0;
@@ -1509,12 +1484,12 @@ int main(int argc, char **argv)
                 if (fseek(script, result, SEEK_SET) != 0) {
                     perror("Failed to seeking interpreter file");
                     fclose(script);
-                    return 1;
+                    goto finish;
                 }                              
                 if (fread(&byte, sizeof(byte), 1, script) != 1) {
                     perror("Failed to reading interpreter file");
                     fclose(script);
-                    return 1;
+                    goto finish;
                 }    
             } 
             fprintf(out, "%02X", ((unsigned char) text[i]) ^ ((int) salt1) ^ ((int) salt2) ^ ((unsigned char) seed[(salt1 + salt2) % salt]) ^ byte);
@@ -1523,71 +1498,22 @@ int main(int argc, char **argv)
     }
     fprintf(out, "    0\n");
     fprintf(out, "};\n\n"); 
+    
     if (inner_flag || anti_flag) fclose(script);
-    i = 0;   
-    while (func_def[i]) fprintf(out, "%s\n", func_def[i++]);
-
-    if (safe_flag) {
-        fprintf(out, "int write_script(FILE *pipe)\n");
-    } else {
-        fprintf(out, "int write_script(int file)\n");
-    }
-
-    i = 0;
-    while (first[i]) fprintf(out, "%s\n", first[i++]);
-    if (safe_flag) {
-        fprintf(out, "                if (fwrite(str, sizeof(char), strlen(str), pipe) != strlen(str)) {\n");
         
-    } else {
-        fprintf(out, "                if (write(file, str, (size_t) strlen(str)) < 0) {\n");
-    }
-
-    i = 0;
-    while (sencod[i]) fprintf(out, "%s\n", sencod[i++]);
-    if (safe_flag) {
-        fprintf(out, "            if (fwrite(str, sizeof(char), strlen(str), pipe) != strlen(str)) {\n");
-    }else {
-        fprintf(out, "            if (write(file, str, (size_t) strlen(str)) < 0) {\n");   
-    }
-
-    i  = 0;
-    while (third[i]) fprintf(out, "%s\n", third[i++]); 
-
-    i = 0;
-    if (safe_flag) { 
-        while (fourth_safe[i]) fprintf(out, "%s\n", fourth_safe[i++]);
-        if (para_flag) {
-            fprintf(out, "    length = strlen(name) + strlen(\"%s\") + 2;\n", parameter);
-            fprintf(out, "    str = malloc(length);\n");
-            fprintf(out, "    memset(str, 0, length);\n");
-            fprintf(out, "    strcat(str, name);\n");
-            fprintf(out, "    strcat(str, \" \");\n");
-            fprintf(out, "    strcat(str, \"%s\");\n", parameter);           
-        } else {
-            fprintf(out, "    str = strdup(name);\n"); 
-        }
-        i = 0;
-        while (fourth_end[i]) fprintf(out, "%s\n", fourth_end[i++]);            
-    } else {        
-        while (fourth[i]) fprintf(out, "%s\n", fourth[i++]);               
-    }
+    i = 0;   
+    while (first[i]) fprintf(out, "%s\n", first[i++]);
 
     /*Write to the fix code section*/    
     if (fix_flag) {   
         i = 0;
         k = 0; 
         length = 0; 
-        if (safe_flag) {
-            if (fix_format != NULL && !strcmp(fix_format, "PHP")) {
-                fprintf(out,  "    fwrite(\"<?php \", sizeof(char), 6, pipe);\n");    
-            } else  if (fix_format != NULL && !strcmp(fix_format, "LUA")) {
-                fprintf(out,  "    fwrite(\"arg = {}; \", sizeof(char), 10, pipe);\n");    
-            }
-        } else {
-            if (fix_format != NULL && !strcmp(fix_format, "PHP")) {
-                fprintf(out,  "    write(file[1], \"<?php \", 6);\n");    
-            }
-        }     
+        
+        if (fix_format != NULL && !strcmp(fix_format, "PHP")) {
+            fprintf(out,  "        write(file, \"<?php \", 6);\n");    
+        }
+        
         while (fix_code[fix_pos][i]) {
             length += strlen(fix_code[fix_pos][i]);
             for (j = 0; j < strlen(fix_code[fix_pos][i]); j++) {
@@ -1597,10 +1523,10 @@ int main(int argc, char **argv)
             }
             i++; 
         }
-        fprintf(out, "    str = (char *) malloc(%d + strlen(argv[0]) * %d);\n", length + 8, k);            
+        fprintf(out, "        name = (char *) malloc(%d + strlen(argv[0]) * %d);\n", length + 8, k);            
         i = 0;
         while (fix_code[fix_pos][i]) {
-            fprintf(out, "    sprintf(str, \"");  
+            fprintf(out, "        sprintf(name, \"");  
             k = 0;             
             for (j = 0; j < strlen(fix_code[fix_pos][i]); j++) {
                 if (fix_code[fix_pos][i][j] == '?') {
@@ -1616,16 +1542,13 @@ int main(int argc, char **argv)
                 fprintf(out, ", argv[0]");
             }           
             fprintf(out, ");\n");
-            if (safe_flag) {                
-                fprintf(out,  "    fwrite(str, sizeof(char), strlen(str), pipe);\n");
-            } else {                
-                fprintf(out,  "    write(file[1], str, strlen(str));\n");
-            }
+                           
+            fprintf(out,  "        write(file, name, strlen(name));\n");
             i++;                   
         }
-        fprintf(out, "    free(str);\n");  
+        fprintf(out, "        xfree(name);\n");  
     }
-
+    
     if (file_flag) {
         fix_file = fopen(file_name, "r");              
         if (fix_file == NULL) {
@@ -1637,13 +1560,13 @@ int main(int argc, char **argv)
         k = 0;
         for (j = 0; j < status.st_size; j++) {
             if (fgetc(fix_file) == '?') {
-                k++;        
+                k++;
             }
         }
-        fprintf(out, "    str = (char *) malloc(%d + strlen(argv[0]) * %d);\n", length + 8, k);
+        fprintf(out, "    name = (char *) malloc(%d + strlen(argv[0]) * %d);\n", length + 8, k);
         rewind(fix_file);
         while (fgets(str, sizeof(str), fix_file)) {
-            fprintf(out, "    sprintf(str, \"");
+            fprintf(out, "    sprintf(name, \"");
             k = 0;
             for (j = 0; j < strlen(str) - 1; j++) {
                 if (str[j] == '?') {
@@ -1659,97 +1582,69 @@ int main(int argc, char **argv)
                 fprintf(out, ", argv[0]");
             }
             fprintf(out, ");\n");
-            if (safe_flag) {
-                fprintf(out,  "    fwrite(str, sizeof(char), strlen(str), pipe);\n");
-            } else {
-                fprintf(out,  "    write(file[1], str, strlen(str));\n");
-            }
+            
+             fprintf(out,  "    write(file, name, strlen(name));\n");
+            
         }
         fclose(fix_file);
-        fprintf(out, "    free(str);\n"); 
+        fprintf(out, "    xfree(name);\n"); 
     }
-
+    
+    if (fix_format != NULL && !strcmp(fix_format, "PHP")) {
+        fprintf(out, "        write(file, \"//\", 2);\n");    
+    }  
+     
+    fprintf(out, "        write_script(file);\n");  
+    
     i = 0;
-    if (safe_flag) { 
-        if (!fix_flag || !arg_code[fix_pos][0]) {
-            i = 0;
-            while(sh_start[i]) fprintf(out, "%s\n", sh_start[i++]); 
-            fprintf(out, "    write_script(pipe);\n");
-            i = 0;
-            while (sh_end[i]) fprintf(out, "%s\n", sh_end[i++]); 
-        } else {              
-            while (arg_start[i]) fprintf(out, "%s\n", arg_start[i++]); 
-            i = 0;
-            while (arg_code[fix_pos][i]) fprintf(out, "        %s\n", arg_code[fix_pos][i++]); 
-            i = 0;
-            while (arg_end[i]) fprintf(out, "%s\n", arg_end[i++]); 
-            if (fix_format != NULL && !strcmp(fix_format, "PHP")) {
-                fprintf(out,  "    fwrite(\"//\", sizeof(char), 2, pipe);\n");    
-            }
-            fprintf(out, "    write_script(pipe);\n");             
-        }      
-        i = 0;        
-        while (fifth_safe[i]) fprintf(out, "%s\n", fifth_safe[i++]); 
-    } else {     
-        if (fix_format != NULL && !strcmp(fix_format, "PHP")) {
-            fprintf(out,  "    write(file[1], \"//\", 2);\n");    
-        }
-        fprintf(out, "%s\n", "    j = 0;");
-        if (para_flag) {
-            fprintf(out, "%s\n", "    args[j++] = strdup(command);"); 
-            fprintf(out, "    args[j++] = strdup(\"%s\");\n", parameter);     
-        } else if (!strcmp(command, "node")) {
-            fprintf(out, "%s\n", "    args[j++] = strdup(command);"); 
-            fprintf(out, "%s\n", "    args[j++] = strdup(\"--preserve-symlinks-main\");"); 
-        } else {
-            fprintf(out, "%s\n", "    args[j++] = strdup(argv[0]);");
-        }
-        i = 0 ;   
-        while (fifth[i]) fprintf(out, "%s\n", fifth[i++]);         
-    }
-
-    /*Write to the main function section*/
-    i = 0;
-    while (main_func[i]) fprintf(out, "%s\n", main_func[i++]);   
-
-    i = 0;
-    if (trace_flag) {      
-        while (traced[i]) fprintf(out, "%s\n", traced[i++]);        
-    } else if (self_flag) {        
-        while (ptrace_self[i]) fprintf(out, "%s\n", ptrace_self[i++]);
-        i = 0;
-        while (traced[i]) fprintf(out, "%s\n", traced[i++]);  
-        i = 0;
-        while (ptrace_self_end[i]) fprintf(out, "%s\n", ptrace_self_end[i++]);  
-    } else if (!strcmp(sysinfo.sysname, "AIX")) {
-        while (ptrace_aix[i]) fprintf(out, "%s\n", ptrace_aix[i++]);  
-        i = 0;
-        while (traced[i]) fprintf(out, "%s\n", traced[i++]);  
-        i = 0;   
-        while (ptrace_aix_end[i]) fprintf(out, "%s\n", ptrace_aix_end[i++]);     
+    while (second[i]) fprintf(out, "%s\n", second[i++]); 
+    
+    if (para_flag) {
+        fprintf(out, "%s\n", "    args[j++] = strdup(command);"); 
+        fprintf(out, "    args[j++] = strdup(\"%s\");\n", parameter);     
+    } else if (!strcmp(command, "node")) {
+        fprintf(out, "%s\n", "    args[j++] = strdup(command);"); 
+        fprintf(out, "%s\n", "    args[j++] = strdup(\"--preserve-symlinks-main\");"); 
     } else {
-        while (ptrace_unix[i]) fprintf(out, "%s\n", ptrace_unix[i++]);
-        i = 0;
-        while (traced[i]) fprintf(out, "%s\n", traced[i++]);  
-        i = 0; 
-        while (ptrace_unix_end[i]) fprintf(out, "%s\n", ptrace_unix_end[i++]);
+        fprintf(out, "%s\n", "    args[j++] = strdup(argv[0]);");
     }
     
     i = 0;
-    if (safe_flag || trace_flag || self_flag) {
-        while (handler[i]) fprintf(out, "%s\n", handler[i++]);     
+    while (third[i]) fprintf(out, "%s\n", third[i++]);         
+
+    /*Write to the main function section*/
+    i = 0;
+    if (trace_flag) {      
+        while (traced[i]) fprintf(out, "%s\n", traced[i++]);        
+    } else if (!strcmp(sysinfo.sysname, "SCO_SV")){
+        while (ptrace_sco[i]) fprintf(out, "%s\n", ptrace_sco[i++]);          
+    } else if (!strcmp(sysinfo.sysname, "AIX")) {
+        while(ptrace_aix[i]) fprintf(out, "%s\n", ptrace_aix[i++]);        
     } else {
-        while (handler_fork[i]) fprintf(out, "%s\n", handler_fork[i++]);     
+        while (ptrace_linux[i]) fprintf(out, "%s\n", ptrace_linux[i++]); 
+        trace_flag = 2;            
     }
-   
     fflush(out);
     fclose(out);
-    printf("Ok! Make binary by \"cc %s -O2 -o %s.x\"\n", outname, inname);
-    free(seed);
-    free(bitmap);
-    free(code_text);
-    free(obscure_text);
-    free(text);
-    free(outname);
+    
+    printf("Ok! You can make binary by \"cc %s -s -O2 -o %s.x%s\"\n", outname, inname, trace_flag == 2 ? " -lpthread" : "");   
+         
+finish:
+    free_args(args, argc);
+    xfree(code_text);
+    xfree(obscure_text);
+    xfree(fix_format);
+    xfree(file_name);
+    xfree(bit);
+    xfree(parameter);
+    xfree(interpreter);
+    xfree(date_str);  
+    xfree(message); 
+    xfree(bitmap);
+    xfree(text);
+    xfree(inname);
+    xfree(outname);
+    xfree(seed);
+    xfree(command);
     return(0);
 }
