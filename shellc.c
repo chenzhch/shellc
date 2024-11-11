@@ -4,7 +4,7 @@
  * Function: Convert script into C code
  * Author: ChenZhongChao
  * Birthdate: 2023-12-25
- * Version: 1.8
+ * Version: 1.8.1
  * Github: https://github.com/chenzhch/shellc.git
  */
 
@@ -556,7 +556,7 @@ static const char *first[] = {
     "    int i, j;",
     "    long mask, salt1, salt2, salt, length, script_length = 0;",
     "    char chr[3], *seed = NULL, summary[65];",
-    "    char fullname[PATH_MAX];",
+    "    char fullname[PATH_MAX + 1];",
     "    FILE *script = NULL;",
     "    struct stat status;", 
     "    unsigned char byte = 0x0;",
@@ -646,14 +646,10 @@ static const char *first[] = {
     "    return(0);",
     "}",
     "",
-    "int handler(int argc, char **argv)",
+    "int check_env()",
     "{",
-    "    char *dev = NULL, *name = NULL, *cwd = NULL, real[PATH_MAX], fullname[PATH_MAX];",
-    "    int file, i, length;",
-    "    pid_t pid;",
-    "    int j, status;",
-    "    char **args = NULL;",
     "    unsigned char summary[65];",
+    "    char fullname[PATH_MAX + 1];"
     "    FILE *in = NULL;",
     "    struct tm *timeinfo;",
     "    struct rlimit rl;",
@@ -709,7 +705,18 @@ static const char *first[] = {
     "            fprintf(stderr, \"Error: invalid interpreter %s\\n\", fullname);",
     "            return(1);",
     "        }",
-    "    }",    
+    "    }", 
+    "    return(0);",       
+    "}",    
+    "",
+    "int handler(int argc, char **argv)",
+    "{",
+    "    char *dev = NULL, *name = NULL, *cwd = NULL, real[PATH_MAX + 1];",
+    "    int file, i, length;",
+    "    pid_t pid;",
+    "    int j, status;",
+    "    char **args = NULL;",
+   
     "    srand(time(0));",
     "    length = rand() % 8 + 16;",
     "    name = malloc((size_t) length);",
@@ -803,7 +810,8 @@ static const char *ptrace_sco[] = {
     "{",
     "    pid_t pid = 0;",
     "    int status;",
-    "    if(ptrace(0, 0, 0, 0)) {",
+    "    if (check_env()) return(1);",
+    "    if (ptrace(0, 0, 0, 0)) {",
     "        return(1);",        
     "    }",
     "    if ((pid = fork()) == 0) {", 
@@ -822,6 +830,7 @@ static const char *ptrace_aix[] = {
     "int main(int argc, char **argv)",
     "{",
     "    pid_t pid = 0;",
+    "    if (check_env()) return(1);",
     "    if ((pid = fork()) == 0) {",
     "        if (__linux_ptrace(PT_WRITE_GPR, getppid(), 0, 0)) {",
     "            kill(getppid(), SIGKILL);",
@@ -845,14 +854,15 @@ static const char *ptrace_linux[] = {
     "    Param param = {argc, argv};",
     "    pthread_t id = 0;",
     "    void *result;",
+    "    if (check_env()) return(1);",
     "    if(ptrace(0, 0, 0, 0)) {",
     "        return(1);",        
     "    }",
-    "    if(pthread_create(&id, 0, (void *) process, &param)) {",
+    "    if (pthread_create(&id, 0, (void *) process, &param)) {",
     "        perror(\"Faild to pthread_create\");",
     "        return(1);",
     "    }",
-    "    if(pthread_join(id, &result)) {",
+    "    if (pthread_join(id, &result)) {",
     "        perror(\"Faild to pthread_join\");",
     "        return(1);",
     "    }",
@@ -864,6 +874,7 @@ static const char *ptrace_linux[] = {
 static const char *traced[] = {
     "int main(int argc, char **argv)",
     "{",
+    "    if (check_env()) return(1);",    
     "    return(handler(argc, argv));",
     "}",
     0 
@@ -989,7 +1000,7 @@ int main(int argc, char **argv)
     int fix_pos = -1;
     char *code_text = NULL, *obscure_text = NULL, *text = NULL;
     char *bitmap = NULL, *inname = NULL, *outname = NULL, *command = NULL, *parameter = NULL;
-    char *fix_format = NULL, *file_name = NULL, *bit = NULL, fullname[PATH_MAX];
+    char *fix_format = NULL, *file_name = NULL, *bit = NULL, fullname[PATH_MAX + 1];
     char *date_str = NULL, *message = NULL;
     char str[1024];
     long result, offset1, offset2, script_length = 0L;
@@ -1157,7 +1168,7 @@ int main(int argc, char **argv)
     }
     
     /*Running environment check*/
-     
+         
     if (uname(&sysinfo)) {
         perror("Failed to uname");
         goto finish;

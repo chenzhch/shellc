@@ -89,6 +89,10 @@ macOS 13|lldb|NO
 
 ### History
 
+- v1.8.1 2024-11-11
+  
+  Fix memory detection errors in special scenarios
+
 - v1.8 2024-11-10
   
   Merge normal mode and safe mode
