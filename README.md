@@ -26,7 +26,7 @@ For programs that require source code protection, it is recommended to use stati
 
   1. Obtaining script source code by reading memory files.
 
-Version 1.8 has resolved issues 1-5, but technically cannot solve issue 6. If the scripting language is ```bash```, it is recommended to use ```xbash```or use it together with ```shellc```. ```xbash```can solve issue 6.
+Version 1.8 has resolved issues 1-3, but technically cannot solve issue 4-6. If the scripting language is ```bash```, it is recommended to use ```xbash```or use it together with ```shellc```. ```xbash```can solve issue 4-6.
 
 Version 1.0 or above not only support shell, but also other scripting languages, which can completely replace  ```shc```. Version 1.6 adds the function of obtaining script source code through anti-counterfeiting interpreter or memory dump. Version 1.8 solves the problem of obtaining source code through file descriptors. Version 1.8 does not support ```ruby```, and ```ruby``` requires version 1.7.
 
