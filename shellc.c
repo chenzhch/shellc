@@ -4,7 +4,7 @@
  * Function: Convert script into C code
  * Author: ChenZhongChao
  * Birthdate: 2023-12-25
- * Version: 1.8.1
+ * Version: 1.8.2
  * Github: https://github.com/chenzhch/shellc.git
  */
 
@@ -269,22 +269,6 @@ static const char *fix_code[][2] = {
     {0, 0}, /*tclsh*/
     {"$argv[0] = '?'; ", 0}, /*php*/
     {0, 0}, /*rc*/
-    {0, 0}
-};
-
-static const char *arg_code[][2] = { 
-    {0, 0}, /*bash*/
-    {"sprintf(name, \"set -a argv '%s'; \", argv[i]);", 0}, /*fish*/
-    {0, 0}, /*zsh*/
-    {"sprintf(name, \"push @ARGV, '%s'; \", argv[i]);", 0}, /*perl*/
-    {"sprintf(name, \"sys.argv.append('''%s'''); \", argv[i]);", 0}, /*python*/
-    {"sprintf(name, \"process.argv.push(`%s`); \", argv[i]);", 0}, /*javascript*/
-    {"sprintf(name, \"table.insert(arg, '%s'); \", argv[i]);", 0}, /*lua*/
-    {"sprintf(name, \"ARGV.push('%s'); \", argv[i]);", 0}, /*ruby*/
-    {"sprintf(name, \"set argv = ($argv %s); \", argv[i]);", 0}, /*csh*/
-    {"sprintf(name, \"set argv [concat $argv %s]; \", argv[i]);", 0}, /*tclsh*/
-    {"sprintf(name, \"array_push($argv, '%s'); \", argv[i]);", 0}, /*php*/
-    {"sprintf(name, \"* = ($* %s); \", argv[i]);", 0}, /*rc*/
     {0, 0}
 };
 
@@ -1028,7 +1012,7 @@ int main(int argc, char **argv)
     memset(digest, 0, sizeof(digest));
     sprintf(digest, "%064d", 0);     
     
-    if(argc > strlen(option)) {
+    if(argc > (int) strlen(option)) {
         fprintf(stderr, "Usage: %s %s\n", argv[0], usage);
         return(1);        
     }
@@ -1042,7 +1026,7 @@ int main(int argc, char **argv)
     for (i = 1; i < argc; i++) {
         if (argv[i][0] == '-') {
             if (strlen(argv[i]) > 1) {
-                for (k = 0; k < strlen(option); k++) {
+                for (k = 0; k < (int) strlen(option); k++) {
                     if (option[k] == argv[i][1]) break;
                 }
                 args[j++] = strdup(argv[i]);
@@ -1149,7 +1133,7 @@ int main(int argc, char **argv)
             fprintf(stderr, "Error: invalid date format\n");
             goto finish;
         }
-        for (i = 0; i < strlen(date_str); i++) {
+        for (i = 0; i < (int) strlen(date_str); i++) {
             if (date_str[i] < '0' || date_str[i] > '9') {
                 fprintf(stderr, "Error: invalid date format\n");
                 goto finish;   
@@ -1527,7 +1511,7 @@ int main(int argc, char **argv)
         
         while (fix_code[fix_pos][i]) {
             length += strlen(fix_code[fix_pos][i]);
-            for (j = 0; j < strlen(fix_code[fix_pos][i]); j++) {
+            for (j = 0; j < (int) strlen(fix_code[fix_pos][i]); j++) {
                 if (fix_code[fix_pos][i][j] == '?') {
                     k++;        
                 }
@@ -1539,7 +1523,7 @@ int main(int argc, char **argv)
         while (fix_code[fix_pos][i]) {
             fprintf(out, "        sprintf(name, \"");  
             k = 0;             
-            for (j = 0; j < strlen(fix_code[fix_pos][i]); j++) {
+            for (j = 0; j < (int) strlen(fix_code[fix_pos][i]); j++) {
                 if (fix_code[fix_pos][i][j] == '?') {
                     fputc('%', out);
                     fputc('s', out);
@@ -1579,7 +1563,7 @@ int main(int argc, char **argv)
         while (fgets(str, sizeof(str), fix_file)) {
             fprintf(out, "    sprintf(name, \"");
             k = 0;
-            for (j = 0; j < strlen(str) - 1; j++) {
+            for (j = 0; j < (int) strlen(str) - 1; j++) {
                 if (str[j] == '?') {
                     fputc('%', out);
                     fputc('s', out);  

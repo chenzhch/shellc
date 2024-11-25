@@ -89,6 +89,10 @@ macOS 13|lldb|NO
 
 ### History
 
+- v1.8.2 2024-11-25
+  
+  Fix Issue #27
+
 - v1.8.1 2024-11-11
   
   Fix memory detection errors in special scenarios
@@ -105,7 +109,7 @@ macOS 13|lldb|NO
 
 - v1.7 2024-09-18
 
-  Fix Issue # 18
+  Fix Issue #18
 
   Safe mode SHELL human-machine interaction support does not modify the source script program
 
